@@ -1,0 +1,21 @@
+{
+  "description": "Gnomonkit supply-chain: suggests patch-review when a dependency version is about to move (suggest only, never blocks)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          { "type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          { "type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\"" }
+        ]
+      }
+    ]
+  }
+}

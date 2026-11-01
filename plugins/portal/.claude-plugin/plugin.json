@@ -1,0 +1,10 @@
+{
+  "name": "portal",
+  "description": "Gnomonkit portal (optional): a small read-only web dashboard over core's effectiveness collector. Tabs for effectiveness (subagents, main context, compaction, budgets, hooks), launch readiness and usage (daily, per project and per session, with an API-equivalent cost and subscription figures when the collector reports them), an Updates tab that shows what the sync gate holds and, on a local loopback portal, drafts the approval pull request, a Work tab of open work items by state (titles, ages and links from core's local summary, never an issue body), plus a Memory tab that searches your past sessions, through a local mempalace CLI when one is installed and otherwise core's history index, read-only. Runs on the machine you develop on (loopback, starts at logon) or on a server (systemd, access token or an authenticating reverse proxy); an install script sets up either. Or writes the page as one static HTML file that needs no server. Serves only aggregates and session titles, never transcripts or prompts. Standard library only.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Gnomonkit contributors"
+  },
+  "homepage": "https://github.com/joshualytle/Gnomonkit",
+  "license": "MIT"
+}

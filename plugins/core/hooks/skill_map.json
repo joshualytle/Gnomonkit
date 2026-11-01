@@ -1,0 +1,79 @@
+{
+  "situations": {
+    "about-to-ship": [
+      "ship-through-prs",
+      "merged-is-not-shipped",
+      "stacked-pr-conflicts",
+      "release-pipeline-traps",
+      "merge-guidance"
+    ],
+    "about-to-start-building": [
+      "before-you-build",
+      "automate-repeats",
+      "work-items"
+    ],
+    "examining-existing-work": [
+      "diff-review",
+      "verify-before-asserting",
+      "owner-is-not-qa"
+    ],
+    "something-is-broken": [
+      "silent-no-op",
+      "agent-shell-traps",
+      "windows-dev-traps",
+      "type-escape-hatches"
+    ],
+    "changing-infrastructure": [
+      "package-manager-pinning",
+      "update-discipline",
+      "dependency-licence-audit",
+      "alert-routing",
+      "production-impact-callout",
+      "decommission-order",
+      "performance-by-default",
+      "preemptive-env-audit"
+    ],
+    "writing-for-people": [
+      "copy-discipline",
+      "owner-voice-documents",
+      "owner-decides-claims",
+      "web-page-baseline",
+      "long-form-layout",
+      "less-on-screen",
+      "report-pages",
+      "tailwind-layer-discipline"
+    ],
+    "touching-something-dangerous": [
+      "secret-safe-inspection",
+      "enumerate-before-destroying",
+      "hardware-paths-are-owner-decisions",
+      "local-cleanup"
+    ],
+    "making-or-clearing-folders": [
+      "folder-placement",
+      "local-compare",
+      "local-cleanup"
+    ],
+    "configuring-the-agent": [
+      "claude-project-format",
+      "central-rules-sync",
+      "token-efficiency",
+      "effectiveness",
+      "automate-repeats",
+      "upstream-before-proposing",
+      "onboarding",
+      "overlay-setup"
+    ],
+    "managing-memory": [
+      "history-recall",
+      "learned-corrections",
+      "learned-triggers",
+      "detector-calibration"
+    ],
+    "wrapping-up": [
+      "session-close",
+      "background-work-visibility",
+      "work-items"
+    ]
+  }
+}

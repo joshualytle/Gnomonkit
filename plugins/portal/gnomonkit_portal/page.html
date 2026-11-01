@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Gnomonkit Portal</title>
+<link rel="icon" href="data:,">
+<style nonce="__NONCE__">
+:root{color-scheme:light;
+  --bg:#f5f5f2;--surface:#ffffff;--surface2:#eeede8;--line:#d9d7cf;--grid:#e6e4dd;
+  --text:#141413;--text2:#4f4e49;--muted:#73716a;
+  --s1:#2b6fcf;--s2:#d4622c;--accent:#2b6fcf;--on-accent:#ffffff;--focus:#2b6fcf;
+  --ok:#1d7a3b;--ok-bg:#e3f3e7;--warn:#8a5a00;--warn-bg:#fff3d6;--bad:#b3261e;--bad-bg:#fde7e4;
+  --nd:#5f5d57;--nd-bg:#ecebe6;
+  --bd0:#d3e2f6;--bd1:#93b8ea;--bd2:#4c84d4;--bd3:#1d4b94}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;
+  --bg:#121211;--surface:#1b1b1a;--surface2:#252523;--line:#363531;--grid:#2b2b28;
+  --text:#efeee9;--text2:#c4c2b9;--muted:#99978e;
+  --s1:#5b9cf0;--s2:#e67a45;--accent:#5b9cf0;--on-accent:#0b0b0b;--focus:#8bbaf5;
+  --ok:#62c48d;--ok-bg:#16301f;--warn:#f0c060;--warn-bg:#3a2d0c;--bad:#f28b80;--bad-bg:#3d1714;
+  --nd:#b5b3aa;--nd-bg:#2a2a27;
+  --bd0:#26364d;--bd1:#335f99;--bd2:#5590e0;--bd3:#a6c9f7}}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#121211;--surface:#1b1b1a;--surface2:#252523;--line:#363531;--grid:#2b2b28;
+  --text:#efeee9;--text2:#c4c2b9;--muted:#99978e;
+  --s1:#5b9cf0;--s2:#e67a45;--accent:#5b9cf0;--on-accent:#0b0b0b;--focus:#8bbaf5;
+  --ok:#62c48d;--ok-bg:#16301f;--warn:#f0c060;--warn-bg:#3a2d0c;--bad:#f28b80;--bad-bg:#3d1714;
+  --nd:#b5b3aa;--nd-bg:#2a2a27;
+  --bd0:#26364d;--bd1:#335f99;--bd2:#5590e0;--bd3:#a6c9f7}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden}
+body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.skip{position:absolute;left:-9999px;top:0;background:var(--surface);padding:8px 12px;border-radius:8px}
+.skip:focus{left:16px;top:8px;z-index:10}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 48px}
+header{padding:14px 0 8px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em}
+#status{color:var(--muted);font-size:13px;flex:1 1 240px;min-width:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.ghost{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 12px;color:var(--text2);cursor:pointer;font-size:13px}
+.ghost:disabled{opacity:.55;cursor:default}
+a.ghost{text-decoration:none}
+nav{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto;scrollbar-width:none}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 10px;cursor:pointer;color:var(--text2);font-weight:550;flex:none}
+nav button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;margin-bottom:14px}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin:0 0 10px;font-weight:650}
+.panel h3{font-size:14px;margin:14px 0 6px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 6px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.tile .v{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.01em;overflow-wrap:anywhere}
+.tile .l{font-size:12.5px;color:var(--text2)}
+.tile .s{font-size:11.5px;color:var(--muted)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:6px;border-bottom:1px solid var(--grid);vertical-align:top}
+th{font-size:12px;color:var(--text2);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.wrap{overflow-wrap:anywhere;min-width:8em}
+.bars{display:grid;gap:8px}
+.bar .bl{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.bar .bl span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .bl b{font-weight:600;font-variant-numeric:tabular-nums;flex:none}
+.bar .track{height:10px;background:var(--surface2);border-radius:4px;margin-top:3px}
+.bar .fill{height:10px;background:var(--s1);border-radius:4px;min-width:2px}
+svg.col{display:block;width:100%;height:150px}
+svg.col rect.m{fill:var(--s1)}
+svg.col rect.m:hover{fill:var(--s2)}
+svg.col line{stroke:var(--grid)}
+.axis{display:flex;justify-content:space-between;color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;margin-top:2px}
+.sub{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.badge{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-ok{background:var(--ok-bg);color:var(--ok)}.b-warn{background:var(--warn-bg);color:var(--warn)}
+.b-fail{background:var(--bad-bg);color:var(--bad)}.b-no-data{background:var(--nd-bg);color:var(--nd)}
+.lab{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-left:4px}
+.empty{color:var(--muted);font-size:14px;padding:4px 0}
+.note{color:var(--muted);font-size:12.5px;margin:8px 0 0}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin:6px 0}
+details{margin-top:8px;font-size:13.5px}
+details>summary{cursor:pointer;color:var(--text2);padding:4px 0}
+form.q{display:flex;gap:8px;margin-bottom:10px}
+form.q input{flex:1;min-width:0;padding:10px 12px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.btn{padding:10px 16px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer;font-weight:600}
+.hit{border-top:1px solid var(--grid);padding:10px 0}
+.hit .h{font-size:12.5px;color:var(--text2);overflow-wrap:anywhere}
+.hit pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 ui-monospace,Consolas,monospace;margin:6px 0 0;background:var(--surface2);padding:8px;border-radius:8px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.stack{display:flex;height:10px;background:var(--surface2);border-radius:4px;margin-top:3px;overflow:hidden}
+.stack i{display:block;height:10px;min-width:0}
+.stack .carry{background:var(--s1)}.stack .work{background:var(--s2)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--text2);margin:0 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.k-carry{background:var(--s1)}.k-work{background:var(--s2)}
+.strip{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--surface2)}
+.strip i{display:block;height:22px;min-width:0}
+.proc{border-top:1px solid var(--grid);padding:8px 0}
+.proc .pt{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
+.proc .pt span{min-width:0;overflow-wrap:anywhere}
+.proc .pt b{font-weight:600;font-variant-numeric:tabular-nums;flex:none}
+.bd0{background:var(--bd0)}.bd1{background:var(--bd1)}.bd2{background:var(--bd2)}.bd3{background:var(--bd3)}
+td a{color:var(--accent);font-weight:600;margin-right:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header>
+  <h1>Gnomonkit Portal</h1>
+  <div id="status" role="status" aria-live="polite">Loading...</div>
+  <!--gk:live-->
+  <button type="button" class="ghost" id="refresh">Refresh data</button>
+  <a class="ghost" id="signout" href="/logout" hidden>Sign out</a>
+  <!--/gk:live-->
+  <button type="button" class="ghost" id="theme" aria-label="Colour theme">Theme: auto</button>
+</header>
+<nav role="tablist" aria-label="Sections" id="tabs">
+  <button role="tab" type="button" id="t-effectiveness" aria-controls="p-effectiveness" aria-selected="true">Effectiveness</button>
+  <button role="tab" type="button" id="t-readiness" aria-controls="p-readiness" aria-selected="false">Readiness</button>
+  <button role="tab" type="button" id="t-usage" aria-controls="p-usage" aria-selected="false">Usage</button>
+  <button role="tab" type="button" id="t-activities" aria-controls="p-activities" aria-selected="false">Where it goes</button>
+  <!--gk:live-->
+  <button role="tab" type="button" id="t-updates" aria-controls="p-updates" aria-selected="false">Updates</button>
+  <button role="tab" type="button" id="t-work" aria-controls="p-work" aria-selected="false">Work</button>
+  <!--/gk:live-->
+  <button role="tab" type="button" id="t-trust" aria-controls="p-trust" aria-selected="false" hidden>Trust</button>
+  <!--gk:memory-->
+  <button role="tab" type="button" id="t-memory" aria-controls="p-memory" aria-selected="false" hidden>Memory</button>
+  <!--/gk:memory-->
+</nav>
+<main id="main" tabindex="-1">
+  <section role="tabpanel" id="p-effectiveness" aria-labelledby="t-effectiveness"></section>
+  <section role="tabpanel" id="p-readiness" aria-labelledby="t-readiness" hidden></section>
+  <section role="tabpanel" id="p-usage" aria-labelledby="t-usage" hidden></section>
+  <section role="tabpanel" id="p-activities" aria-labelledby="t-activities" hidden></section>
+  <!--gk:live-->
+  <section role="tabpanel" id="p-updates" aria-labelledby="t-updates" hidden></section>
+  <section role="tabpanel" id="p-work" aria-labelledby="t-work" hidden></section>
+  <!--/gk:live-->
+  <section role="tabpanel" id="p-trust" aria-labelledby="t-trust" hidden></section>
+  <!--gk:memory-->
+  <section role="tabpanel" id="p-memory" aria-labelledby="t-memory" hidden>
+    <div class="panel">
+      <h2>Search memory</h2>
+      <form class="q" id="mform">
+        <label class="vh" for="mq">Search past sessions</label>
+        <input id="mq" type="search" maxlength="200" autocomplete="off" placeholder="Search past sessions">
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <div id="mres" aria-live="polite"></div>
+      <p class="note" id="mnote">Read-only search of your past sessions. Snippets are cut short and long token-like strings are masked.</p>
+    </div>
+  </section>
+  <!--/gk:memory-->
+</main>
+</div>
+<svg id="svg-ns" hidden aria-hidden="true"></svg>
+<!--gk:data-->
+<script nonce="__NONCE__">
+"use strict";
+// Every piece of text reaches the page through textContent (el, sv). Nothing here parses a string
+// as HTML, so transcript-derived strings such as session titles can never become markup.
+// A static snapshot (run_portal.py snapshot) carries its data in the gk-snapshot JSON block and makes
+// no request at all: its CSP has connect-src 'none', and the code below never calls fetch there.
+const $ = id => document.getElementById(id);
+const SNAP = $("gk-snapshot");
+// The SVG namespace, read from an inline <svg> so the file names no URL at all.
+const SVG_NS = $("svg-ns").namespaceURI;
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; }
+function sv(tag, attrs) { const e = document.createElementNS(SVG_NS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; }
+const isNum = x => typeof x === "number" && isFinite(x);
+function num(x) { if (!isNum(x)) return "—"; const a = Math.abs(x);
+  for (const [d, s] of [[1e9, "G"], [1e6, "M"], [1e3, "k"]]) if (a >= d) return (x / d).toFixed(a >= d * 100 ? 0 : 1) + s;
+  return String(Math.round(x * 100) / 100); }
+const usd = x => isNum(x) ? "$" + (Math.abs(x) >= 100 ? Math.round(x).toLocaleString() : x.toFixed(2)) : "—";
+const pct = x => isNum(x) ? Math.round(x * 100) + "%" : "—";
+
+function panel(title, ...kids) { const p = el("div", "panel"); p.append(el("h2", "", title), ...kids.filter(Boolean)); return p; }
+function tile(v, l, s) { const d = el("div", "tile"); d.append(el("div", "v", v)); const lab = el("div", "l", l); d.append(lab); if (s) d.append(el("div", "s", s)); return d; }
+function tiles(list) { const d = el("div", "tiles"); list.filter(Boolean).forEach(t => d.append(tile(...t))); return d; }
+function labelled(text, lab) { const s = el("span", "", text); if (lab) s.append(el("span", "lab", lab)); return s; }
+function table(heads, rows, numCols) {
+  const w = el("div", "tw"), t = el("table"), hr = el("tr"), nc = numCols || [];
+  heads.forEach((h, i) => hr.append(el("th", nc.includes(i) ? "num" : "", h)));
+  const th = el("thead"); th.append(hr); t.append(th);
+  const tb = el("tbody");
+  rows.forEach(r => { const tr = el("tr");
+    r.forEach((c, i) => { if (c instanceof Node) { const td = el("td", nc.includes(i) ? "num" : ""); td.append(c); tr.append(td); }
+      else tr.append(el("td", nc.includes(i) ? "num" : "wrap", c == null ? "—" : c)); });
+    tb.append(tr); });
+  if (!rows.length) { const tr = el("tr"), td = el("td", "empty", "none"); td.colSpan = heads.length; tr.append(td); tb.append(tr); }
+  t.append(tb); w.append(t); return w;
+}
+function bars(rows, fmt) {
+  const d = el("div", "bars"), max = Math.max(...rows.map(r => r[1] || 0), 1e-9);
+  rows.forEach(([label, v, tip]) => { const b = el("div", "bar"); if (tip) b.title = tip;
+    const bl = el("div", "bl"); bl.append(el("span", "", label), el("b", "", fmt(v)));
+    const tr = el("div", "track"), f = el("div", "fill"); f.style.width = (100 * Math.max(0, v || 0) / max).toFixed(1) + "%";
+    tr.append(f); b.append(bl, tr); d.append(b); });
+  return d;
+}
+// One series per chart, zero baseline, a title on every mark so its value is readable on hover or by AT.
+function columns(points, fmt, label) {
+  const W = 640, H = 150, L = 4, B = 2, T = 8, n = points.length;
+  const svg = sv("svg", {class: "col", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img", "aria-label": label});
+  if (!n) return svg;
+  const max = Math.max(...points.map(p => p[1] || 0), 1e-9), bw = (W - L) / n;
+  svg.append(sv("line", {x1: 0, x2: W, y1: H - B, y2: H - B}));
+  points.forEach((p, i) => { const h = Math.max(1, (H - B - T) * (p[1] || 0) / max);
+    const r = sv("rect", {class: "m", x: L + i * bw + bw * .12, width: Math.max(1, bw * .76), y: H - B - h, height: h, rx: 2});
+    const t = sv("title"); t.textContent = p[0] + ": " + fmt(p[1]); r.append(t); svg.append(r); });
+  // Axis labels sit outside the stretched SVG so they keep their size at any width.
+  const box = el("div", "chart"), ax = el("div", "axis");
+  ax.append(el("span", "", points[0][0]), el("span", "", n > 1 ? points[n - 1][0] : ""));
+  box.append(svg, ax);
+  return box;
+}
+function fold(summary, ...kids) { const d = el("details"); d.append(el("summary", "", summary), ...kids.filter(Boolean)); return d; }
+function emptyState(what, hint) { return panel(what, el("p", "empty", hint)); }
+const NO_DATA = "No data yet. Run the refresh (the button above, the nightly task, or run_portal.py refresh).";
+
+// ---------------------------------------------------------------- effectiveness
+function renderEffectiveness(sec, box) {
+  if (!sec) { box.append(emptyState("Effectiveness", NO_DATA)); return; }
+  const h = sec.headline || {};
+  if (Object.keys(h).length) {
+    const ts = h.tokens_saved || {}, sp = h.subagent_spend || {}, wi = h.worth_it || {};
+    box.append(tiles([[num(ts.value), "tokens saved", (ts.label || "") + " · reads avoided"],
+      [num(sp.value), "spent on subagents", sp.label || ""],
+      [num((h.spawns || {}).value), "subagent spawns"],
+      [isNum(wi.value) ? wi.value + " of " + num(wi.of) : "—", "worth it", wi.label || ""]]));
+  }
+  const s = sec.subagents;
+  if (s) {
+    const L = s.labels || {};
+    const p = panel("Subagents",
+      tiles([[num(s.spawns), "spawns", num(s.linked) + " linked to a parent"],
+        [num((s.spend || {}).total), "own token spend", L.spend],
+        [num(s.reads_avoided), "reads avoided", L.reads_avoided],
+        [num(s.not_worth_it), "not worth it", num(s.small) + " small investigations"]]));
+    if ((s.by_type || []).length) {
+      p.append(el("h3", "", "Spend by type"), bars(s.by_type.slice(0, 8).map(r => [r.name, r.spend, num(r.spawns) + " spawns"]), num));
+      p.append(fold("By type: worth-it share and reads avoided", table(["Type", "Spawns", "Worth it", "Spend", "Reads avoided"],
+        s.by_type.map(r => [r.name, num(r.spawns), pct(r.worth_it_share), num(r.spend), num(r.reads_avoided)]), [1, 2, 3, 4])));
+    }
+    // The window's first and last weeks are usually part weeks: say so, so a short bar is not read as a slow week.
+    const wk = r => r.partial ? r.name + " (part week" + (isNum(r.days_in_window) ? ", " + r.days_in_window + " days" : "") + ")" : r.name;
+    if ((s.by_week || []).length > 1) p.append(el("h3", "", "Spawns per week (UTC)"), columns(s.by_week.map(r => [wk(r), r.spawns]), num, "Spawns per week"));
+    if ((s.by_project || []).length) p.append(fold("By project", table(["Project", "Spawns", "Worth it", "Spend", "Reads avoided"],
+      s.by_project.map(r => [r.name, num(r.spawns), pct(r.worth_it_share), num(r.spend), num(r.reads_avoided)]), [1, 2, 3, 4])));
+    if ((s.not_worth_it || []).length) p.append(fold("Spawns that did not pay back (" + s.not_worth_it.length + ")",
+      table(["Type", "Project", "Week", "Spend", "Reads avoided"], s.not_worth_it.map(r => [r.type, r.project, r.week, num(r.spend), num(r.reads_avoided)]), [3, 4]),
+      el("p", "note", "The kinds of task to stop delegating, or to delegate with a tighter brief.")));
+    box.append(p);
+  } else box.append(emptyState("Subagents", "The metrics file has no subagent section."));
+  const c = sec.main_context;
+  if (c) {
+    const L = c.labels || {};
+    const p = panel("Main context", tiles([[num(c.sessions), "sessions"], [num(c.turns), "turns", L.turns],
+      [num(c.median), "median context", L.median], [num(c.peak), "peak context", L.peak],
+      [num(c.compacted_sessions), "sessions that compacted", num(c.compactions) + " compactions"]]));
+    const over = Object.keys(c.over || {}).sort((a, b) => a - b);
+    if (over.length) p.append(el("h3", "", "Above each context size"), table(["Context above", "Share of turns", "Share of re-read"],
+      over.map(k => [num(+k), pct(c.over[k].turns_share), pct(c.over[k].reread_share)]), [0, 1, 2]));
+    if (isNum(c.budget)) p.append(el("p", "note", "Re-read if every turn were capped at the " + num(c.budget) + " budget: " +
+      num(c.reread_capped) + " of " + num(c.reread) + " (ESTIMATED)."));
+    if ((c.top_sessions || []).length) p.append(fold("Heaviest sessions by re-read", table(["Session", "Turns", "Peak", "Re-read"],
+      c.top_sessions.map(r => { const s = el("span", "", r.title || r.session); s.append(el("span", "sub", r.project)); return [s, num(r.turns), num(r.peak), num(r.reread)]; }), [1, 2, 3])));
+    box.append(p);
+  }
+  const b = sec.budgets;
+  if (b && (b.projects || []).length) {
+    const act = b.projects.filter(r => r.change), rest = b.projects.filter(r => !r.change);
+    const proj = r => { const s = el("span", "", r.project); if (r.reason) s.append(el("span", "sub", r.reason)); return s; };
+    const row = r => [proj(r), num(r.current), num(r.recommended), el("span", "badge b-" + (r.confidence === "high" ? "ok" : r.confidence === "medium" ? "warn" : "no-data"), r.confidence || "—")];
+    const heads = ["Project and why", "Current", "Suggested", "Confidence"];
+    const p = panel("Context budgets");
+    p.append(act.length ? table(heads, act.map(row), [1, 2]) : el("p", "empty", "No project needs a change."));
+    if (rest.length) p.append(fold(rest.length + " project(s) already at their suggested budget", table(heads, rest.map(row), [1, 2])));
+    p.append(el("p", "note", (b.label || "") + ". The collector recommends only; it never writes to a project."));
+    box.append(p);
+  }
+  const comp = sec.compaction;
+  if (comp && comp.length) box.append(panel("Compaction per project", fold("Base context, growth and harm signals (" + comp.length + " projects)",
+    table(["Project", "Sessions", "Base", "Growth p90", "Compactions", "Re-read before", "Re-read after", "Corrected"],
+      comp.map(r => [r.project, num(r.sessions), num(r.base), num(r.growth_p90), num(r.c_count), pct(r.c_reread_pre), pct(r.c_reread_post),
+        isNum(r.c_correction_checked) ? num(r.c_corrected) + " of " + num(r.c_correction_checked) : "—"]), [1, 2, 3, 4, 5, 6, 7]))));
+  const hk = sec.hooks;
+  if (hk) {
+    const il = hk.interlock || {}, pal = hk.palace || {};
+    const p = panel("Hooks", tiles([[num(il.blocks), "interlock blocks"], [num((hk.correction_watch || {}).fires), "correction-watch fires"],
+      [num((hk.freshness || {}).notices), "freshness notices"], [pct(pal.cite_rate), "precedent cited", num(pal.cited) + " of " + num(pal.injected)]]));
+    if ((hk.router || []).length) p.append(fold("Skill router uptake (" + hk.router.length + " skills)", table(["Skill", "Suggested", "Loaded", "Uptake"],
+      hk.router.map(r => [r.name, num(r.suggested), num(r.taken), pct(r.uptake)]), [1, 2, 3])));
+    box.append(p);
+  }
+  if (sec.digest) box.append(panel("Output digest", tiles([[num(sec.digest.calls), "calls"], [num(sec.digest.saved_tokens), "tokens saved", "ESTIMATED"],
+    [num(sec.digest.reads_avoided), "reads avoided", "ESTIMATED"]])));
+}
+
+// ---------------------------------------------------------------- readiness
+const ORDER = {fail: 0, warn: 1, "no-data": 2, ok: 3};
+function renderReadiness(sec, box) {
+  if (!sec) { box.append(emptyState("Launch readiness", "No readiness rows in the metrics file. They need a core collector that reports readiness; update core, then refresh.")); return; }
+  const sm = sec.summary || {};
+  box.append(tiles([[num(sm.fail || 0), "failing"], [num(sm.warn || 0), "warning"], [num(sm["no-data"] || 0), "not enough data"], [num(sm.ok || 0), "on target"]]));
+  const rows = (sec.rows || []).slice().sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+  const open = rows.filter(r => r.status !== "ok"), ok = rows.filter(r => r.status === "ok");
+  const heads = ["Metric", "Value", "Target", "Samples", "Status"];
+  const row = r => [labelled(r.metric || r.id, r.label), r.display, r.target, num(r.n), el("span", "badge b-" + (r.status || "no-data"), r.status || "no-data")];
+  const p = panel("Launch readiness");
+  p.append(open.length ? table(heads, open.map(row), [1, 3]) : el("p", "empty", "Every row is on target."));
+  if (ok.length) p.append(fold(ok.length + " row(s) on target", table(heads, ok.map(row), [1, 3])));
+  const defs = el("dl");
+  rows.forEach(r => { defs.append(el("dt", "", r.metric || r.id)); const dd = el("dd", "", r.definition || ""); if (r.note) dd.append(el("div", "note", r.note)); defs.append(dd); });
+  p.append(fold("What each row counts", defs));
+  box.append(p);
+}
+
+// ---------------------------------------------------------------- usage
+function renderUsage(sec, box, meta) {
+  if (!sec) { box.append(emptyState("Usage", "No usage section in the metrics file. It needs a core collector that reports usage; update core, then refresh.")); return; }
+  const t = sec.total || {}, sub = sec.subscription || {}, mtd = sec.month_to_date || {};
+  const planned = sub.status === "ok";
+  const mult = x => isNum(x) ? x.toFixed(x >= 10 ? 0 : 1) + "×" : "—";
+  // Headline: this month's plan against what the same tokens would cost at API prices.
+  if (planned && isNum(mtd.subscription_usd)) {
+    const p = panel("This month" + (mtd.plan ? " · " + mtd.plan : "") + (mtd.month ? " · " + mtd.month : ""),
+      tiles([[usd(mtd.subscription_usd), "plan this month"],
+        [usd(mtd.api_equiv_usd), "API-equivalent so far", "day " + num(Math.ceil(mtd.days_elapsed || 0)) + " of " + num(mtd.days_in_month)],
+        [usd(mtd.projected_api_equiv_usd), "projected for the month", mtd.label || "ESTIMATED"],
+        [mult(mtd.projected_value_multiple), "projected multiple of the plan", isNum(mtd.plan_value_days_used) ? Math.round(mtd.plan_value_days_used).toLocaleString() + " days of plan value used so far" : ""]]));
+    if (mtd.note) p.append(el("p", "note", mtd.note));
+    box.append(p);
+  } else if (sub.status) {
+    box.append(panel("Subscription", el("p", "empty", sub.note || "No subscription plan covers this month.")));
+  }
+  box.append(tiles([[num(t.total), "tokens", num(t.turns) + " assistant turns"], [usd(t.est_cost_usd), "API-equivalent cost", sec.label || "estimate"],
+    planned && isNum(t.subscription_usd) ? [usd(t.subscription_usd), "plan dollars in the window", mult(t.value_multiple) + " API-equivalent of it"] : null,
+    [num(sec.session_count), "sessions"], t.unpriced_turns ? [num(t.unpriced_turns), "unpriced turns", "model missing from the price table"] : null]));
+  const months = sec.months || [];
+  if (planned && months.length) box.append(panel("Months", table(["Month", "Plan $", "API-equivalent $", "Multiple"],
+    months.slice().reverse().map(r => { const s = el("span", "", r.month); s.append(el("span", "sub", (r.plan || "no plan") + (r.covers_full_month === false ? " · part of the month" : ""))); return [s, usd(r.subscription_usd_window), usd(r.api_equiv_usd), mult(r.value_multiple)]; }), [1, 2, 3]),
+    sub.method ? fold("How share of plan is worked out", el("p", "note", sub.method)) : null));
+  const hasShare = rows => planned && rows.some(r => isNum(r.subscription_usd_share));
+  const daily = sec.daily || [];
+  // Core buckets turns by calendar day in UTC (daily_timezone), so a local evening can land on the next day.
+  const tz = sec.daily_timezone || "UTC";
+  const dp = panel("Daily (" + tz + ")");
+  if (daily.length) {
+    const priced = daily.some(r => isNum(r.est_cost_usd) && r.est_cost_usd > 0);
+    dp.append(el("h3", "", (priced ? "API-equivalent cost per " : "Tokens per ") + tz + " day"),
+      columns(daily.map(r => [r.date, priced ? r.est_cost_usd : r.total]), priced ? usd : num, priced ? "Cost per day" : "Tokens per day"));
+    const ds = hasShare(daily);
+    dp.append(fold("Per " + tz + " day (" + daily.length + " days)", table(["Day (" + tz + ")", "Tokens", "API-equivalent $"].concat(ds ? ["Plan $"] : []),
+      daily.slice().reverse().map(r => [r.date, num(r.total), usd(r.est_cost_usd)].concat(ds ? [usd(r.subscription_usd_share)] : [])),
+      ds ? [1, 2, 3] : [1, 2])));
+  } else dp.append(el("p", "empty", "No days in the window."));
+  box.append(dp);
+  const pr = sec.projects || [];
+  if (pr.length) {
+    const ps = hasShare(pr);
+    const pw = r => { const s = el("span", "", r.project); s.append(el("span", "sub", num(r.sessions) + " sessions · " + num(r.total) + " tokens")); return s; };
+    const heads = ["Project", "API-equivalent $"].concat(ps ? ["Share of plan $"] : []);
+    const row = r => [pw(r), usd(r.est_cost_usd)].concat(ps ? [usd(r.subscription_usd_share)] : []);
+    const nc = ps ? [1, 2] : [1];
+    const p = panel("Projects", table(heads, pr.slice(0, 10).map(row), nc));
+    if (pr.length > 10) p.append(fold("Next " + (pr.length - 10) + " projects", table(heads, pr.slice(10).map(row), nc)));
+    box.append(p);
+  }
+  const ss = sec.sessions || [];
+  if (ss.length) {
+    const sh = hasShare(ss);
+    const who = r => { const s = el("span", "", r.title || r.session); s.append(el("span", "sub", r.project + " · " + (r.last_ts || "").slice(0, 10) + " · " + num(r.total) + " tokens")); return s; };
+    const heads = [meta.hide_titles ? "Session" : "Session title", "API-equivalent $"].concat(sh ? ["Share of plan $"] : []);
+    const row = r => [who(r), usd(r.est_cost_usd)].concat(sh ? [usd(r.subscription_usd_share)] : []);
+    const nc = sh ? [1, 2] : [1];
+    const p = panel("Sessions", table(heads, ss.slice(0, 10).map(row), nc));
+    if (ss.length > 10) p.append(fold("Next " + (ss.length - 10) + " sessions", table(heads, ss.slice(10).map(row), nc)));
+    box.append(p);
+  }
+  const md = sec.models || [];
+  if (md.length) box.append(panel("Models", fold("Tokens and cost per model (" + md.length + ")", table(["Model", "Turns", "Tokens", "Cost"],
+    md.map(r => [r.model, num(r.turns), num(r.total), isNum(r.est_cost_usd) ? usd(r.est_cost_usd) : "not priced"]), [1, 2, 3]))));
+  box.append(el("p", "note", sec.note || "API-equivalent: what the same tokens would cost at API list prices. A subscription is not billed per token."));
+}
+
+// ---------------------------------------------------------------- where it goes
+// One bar per activity, split into context carry (re-sending the context) and work (input + output).
+function stackBars(rows, max) {
+  const d = el("div", "bars");
+  rows.forEach(r => { const b = el("div", "bar"), cost = r.cost_usd || 0, carry = Math.max(0, r.context_carry_usd || 0), work = Math.max(0, r.work_usd || 0);
+    b.title = r.activity + ": " + usd(cost) + " · context carry " + usd(carry) + " · work " + usd(work);
+    const bl = el("div", "bl"); bl.append(el("span", "", r.activity), el("b", "", usd(cost) + " · " + pct(r.share)));
+    const st = el("div", "stack"), c = el("i", "carry"), w = el("i", "work");
+    c.style.width = (100 * carry / max).toFixed(2) + "%"; w.style.width = (100 * work / max).toFixed(2) + "%";
+    st.setAttribute("role", "img"); st.setAttribute("aria-label", "context carry " + usd(carry) + ", work " + usd(work));
+    st.append(c, w); b.append(bl, st);
+    b.append(el("span", "sub", "context carry " + pct(r.context_carry_share) + " · " + num(r.turns) + " turns · " + num(r.sessions) + " sessions"));
+    d.append(b); });
+  return d;
+}
+function legend(items) { const l = el("div", "legend"); items.forEach(([cls, t]) => { const s = el("span"); s.append(el("i", cls), document.createTextNode(t)); l.append(s); }); return l; }
+function renderActivities(sec, box, meta) {
+  if (!sec) { box.append(emptyState("Where it goes", "No activities section in the metrics file. It needs core 0.20.0 or newer; update core, then refresh.")); return; }
+  const t = sec.total || {}, acts = sec.activities || [];
+  box.append(tiles([[usd(t.cost_usd), "API-equivalent cost", sec.label || "estimate"],
+    [pct(t.context_carry_share), "of it is context carry", "cache read + cache write"],
+    [acts.length ? usd(acts[0].cost_usd) : "—", acts.length ? "top: " + acts[0].activity : "most expensive activity", acts.length ? pct(acts[0].share) + " of the cost" : ""],
+    [num(t.split_turns), "turns split across activities", num(t.turns) + " turns in all"]]));
+  const p = panel("Activities by cost");
+  if (acts.length) {
+    const max = Math.max(...acts.map(r => r.cost_usd || 0), 1e-9), planned = acts.some(r => isNum(r.subscription_usd_share));
+    p.append(legend([["k-carry", "context carry (re-sending the context)"], ["k-work", "work (input + output)"]]), stackBars(acts.slice(0, 12), max));
+    if (acts.length > 12) p.append(fold("Next " + (acts.length - 12) + " activities", stackBars(acts.slice(12), max)));
+    p.append(fold("As a table", table(["Activity", "API-equivalent $", "Share", "Context carry", "Turns", "Sessions"].concat(planned ? ["Share of plan $"] : []),
+      acts.map(r => [r.activity, usd(r.cost_usd), pct(r.share), pct(r.context_carry_share), num(r.turns), num(r.sessions)].concat(planned ? [usd(r.subscription_usd_share)] : [])),
+      planned ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5])));
+    acts.filter(r => (r.inner || []).length).slice(0, 6).forEach(r => p.append(fold("Inside " + r.activity + " (" + usd(r.cost_usd) + ")",
+      table(["Activity", "API-equivalent $", "Share", "Context carry"], r.inner.map(x => [x.activity, usd(x.cost_usd), pct(x.share), pct(x.context_carry_share)]), [1, 2, 3]))));
+    acts.filter(r => (r.programs || []).length).forEach(r => p.append(fold("Programs in " + r.activity,
+      table(["Program", "API-equivalent $", "Turns"], r.programs.map(x => [x.program, usd(x.cost_usd), num(x.turns)]), [1, 2]))));
+  } else p.append(el("p", "empty", "No priced turns in the window."));
+  box.append(p);
+  const bands = (sec.context_bands || []).filter(b => isNum(b.above)).sort((a, b) => a.above - b.above);
+  if (bands.length) {
+    const bp = panel("Cost by context size"), cuts = bands.map(b => b.cost_share || 0), segs = [], labs = [];
+    let prev = 1;
+    cuts.forEach((s, i) => { segs.push(Math.max(0, prev - s)); labs.push(i ? num(bands[i - 1].above) + "–" + num(bands[i].above) : "up to " + num(bands[0].above)); prev = s; });
+    segs.push(Math.max(0, prev)); labs.push("above " + num(bands[bands.length - 1].above));
+    const strip = el("div", "strip"); strip.setAttribute("role", "img");
+    strip.setAttribute("aria-label", labs.map((l, i) => l + ": " + pct(segs[i])).join(", "));
+    segs.forEach((s, i) => { const seg = el("i", "bd" + Math.min(i, 3)); seg.style.width = (100 * s).toFixed(2) + "%"; seg.title = labs[i] + " context: " + pct(s) + " of cost"; strip.append(seg); });
+    bp.append(legend(labs.map((l, i) => ["bd" + Math.min(i, 3), l + " · " + pct(segs[i])])), strip);
+    bp.append(el("p", "note", bands.map(b => pct(b.cost_share) + " of cost in turns above " + num(b.above)).join(" · ") + ". Context is each turn's input + cache read + cache write."));
+    box.append(bp);
+  }
+  const pr = sec.processes || [], rule = sec.process_rule || {};
+  const plist = el("div");
+  pr.forEach(r => { const d = el("div", "proc"), top = el("div", "pt");
+    top.append(el("span", "", (r.steps || []).join(" → ")), el("b", "", usd(r.cost_usd_per_run) + " per run"));
+    d.append(top, el("span", "sub", num(r.runs) + " runs · " + num(r.sessions) + " sessions · " + usd(r.cost_usd) + " in all")); plist.append(d); });
+  box.append(panel("Repeated processes", pr.length ? plist
+    : el("p", "empty", "No command sequence repeated across " + num(rule.min_sessions || 3) + " sessions."),
+    el("p", "note", "A process is a command sequence automate-repeats finds in at least " + num(rule.min_sessions || 3) + " sessions. Cost per run is the cost attributed to its calls: the number to weigh against scripting it.")));
+  if (sec.method) box.append(fold("How cost is attributed", el("p", "note", sec.method)));
+}
+
+// ---------------------------------------------------------------- updates (the sync gate, docs/SYNC.md)
+const STATE_BADGE = {current: ["up to date", "b-ok"], advanced: ["advanced", "b-ok"], held: ["held for review", "b-warn"],
+  unverified: ["not offered", "b-warn"], error: ["check failed", "b-fail"], unchecked: ["not checked yet", "b-no-data"]};
+const sha12 = x => x ? String(x).slice(0, 12) : "—";
+function cmdNote(text, cmd) { const p = el("p", "note", text + " "); p.append(el("code", "", cmd)); return p; }
+function draftButton(id, label, out) {
+  const b = el("button", "btn", label); b.type = "button";
+  b.addEventListener("click", async () => {
+    b.disabled = true; b.textContent = "Drafting...";
+    out.replaceChildren(el("p", "empty", "Pushing a branch to your overlay and opening the pull request..."));
+    try {
+      const r = await api("/api/sync/approve", {method: "POST", body: JSON.stringify({id: id}),
+        headers: {"Content-Type": "application/json", "Accept": "application/json"}});
+      const p = el("p", "note", r.already ? "This approval was drafted before (branch " + r.branch + "). Merge or close that pull request. "
+        : "Pushed " + r.branch + " to your overlay. ");
+      const link = r.pr || r.compare;
+      if (link && /^https:\/\//.test(link)) { const a = el("a", "", r.pr ? "Open the pull request" : "Open a pull request for it");
+        a.href = link; a.rel = "noopener noreferrer"; a.target = "_blank"; p.append(a); }
+      else if (!r.already) p.append("Open a pull request from that branch in your overlay.");
+      out.replaceChildren(p, el("p", "note", "Merging it is the approval; the next sync check picks it up."));
+      b.textContent = "Drafted";
+    } catch (e) { out.replaceChildren(el("p", "warnbox", "The draft was not made: " + e.message)); b.disabled = false; b.textContent = label; }
+  });
+  return b;
+}
+function renderUpdates(v, box) {
+  const sources = v.sources || [], held = v.held || [];
+  $("t-updates").textContent = held.length ? "Updates (" + held.length + ")" : "Updates";
+  if (v.unreadable) box.append(el("p", "warnbox", "The sync gate's folder could not be read."));
+  if (!sources.length) {
+    box.append(panel("Updates", el("p", "empty", "No plugin source is under the sync gate yet."),
+      cmdNote("Put one under it in a terminal:", "gnomonkit sync adopt <marketplace>"),
+      el("p", "note", "The gate fetches each update into quarantine and moves your approved copy only over commits signed by a key you approved; anything else is held here for review.")));
+    return;
+  }
+  if (v.overlay === false) box.append(el("p", "warnbox", "No overlay is set, so nothing can be approved by pull request: updates move only when signed by the release key Gnomonkit suggests. Set one in a terminal with gnomonkit sync overlay set <remote>."));
+  const keys = sources.filter(s => s.signers_draft);
+  if (keys.length) {
+    const p = panel("Release key to approve");
+    keys.forEach(s => { const out = el("div");
+      p.append(el("p", "", s.name + ": Gnomonkit suggests a release key your overlay does not list yet. Approving it adds the key to your overlay through a pull request."));
+      if (v.approval) p.append(draftButton(s.signers_draft, "Draft approval", out));
+      p.append(out, cmdNote(v.approval ? "Or in a terminal:" : "Draft it in a terminal:", "gnomonkit sync approve-draft " + s.signers_draft)); });
+    box.append(p);
+  }
+  const hp = panel("Held for review");
+  if (!held.length) hp.append(el("p", "empty", "Nothing is held. Updates signed by approved keys move on their own."));
+  held.forEach(h => {
+    const d = el("div", "proc"), top = el("div", "pt");
+    top.append(el("span", "", h.source + " · " + (h.branch || "") + " · " + sha12(h.pin) + " → " + sha12(h.head)),
+      el("b", "", (isNum(h.commits) ? num(h.commits) + " commit" + (h.commits === 1 ? "" : "s") : "")));
+    d.append(top, el("span", "sub", "held since " + (h.created || "?").replace("T", " ").slice(0, 16)));
+    const ul = el("ul");
+    (h.reasons || []).forEach(r => { const li = el("li", "", r.text || r.kind);
+      if (r.paths && r.paths.length) li.append(el("span", "sub", "touches " + r.paths.join(", ")));
+      ul.append(li); });
+    d.append(ul);
+    const files = h.files || [];
+    if (files.length) d.append(fold("Files changed (" + num(h.files_total || files.length) + ")",
+      table(["File", "Added", "Deleted"], files.map(f => [f.path, num(f.added), num(f.deleted)]), [1, 2]),
+      h.files_total > files.length ? el("p", "note", "The first " + files.length + " of " + num(h.files_total) + " are shown.") : null));
+    const out = el("div");
+    if (v.approval) d.append(draftButton(h.id, "Draft approval", out));
+    d.append(out, cmdNote("Read the full diff in a terminal:", "gnomonkit sync explain " + h.id));
+    if (!v.approval) d.append(cmdNote("Draft the approval in a terminal:", "gnomonkit sync approve-draft " + h.id));
+    hp.append(d);
+  });
+  hp.append(el("p", "note", "Drafting opens a pull request on your overlay. Merging it, after you have read the change, is the approval; closing it changes nothing." + (v.approval ? "" : " The Draft approval button appears only when this portal runs on loopback without a token or proxy.")));
+  box.append(hp);
+  box.append(panel("Sources", table(["Source", "Branch", "State", "Approved", "Upstream", "Checked"],
+    sources.map(s => { const [t, c] = STATE_BADGE[s.state] || STATE_BADGE.unchecked;
+      return [s.name, s.branch, el("span", "badge " + c, t), sha12(s.pin), sha12(s.head), (s.checked || "").replace("T", " ").slice(0, 16) || null]; })),
+    el("p", "note", "Checked hourly at session start and nightly with the portal's refresh. A source that is not offered or failed says why in gnomonkit sync status.")));
+}
+
+// ---------------------------------------------------------------- work items
+// Titles and claim names come from GitHub issues anyone with access may write: textContent only, like
+// every other string here. The link is rebuilt by the server from the repository and number.
+const WORK_STATES = [["active", "Active", "b-ok"], ["blocked", "Blocked", "b-fail"], ["review", "In review", "b-warn"], ["open", "Open", "b-no-data"]];
+function ago(s) { if (!isNum(s)) return "—"; for (const [d, u] of [[86400, "d"], [3600, "h"], [60, "m"]]) if (s >= d) return Math.floor(s / d) + u; return "now"; }
+// Only an https link to github.com itself (no port, no user part) becomes a link. It is parsed rather than
+// matched as text, so the page names no URL: a static snapshot must carry none.
+function githubLink(u) {
+  if (typeof u !== "string") return null;
+  try { const x = new URL(u); return x.protocol === "https:" && x.hostname === "github.com" && !x.port && !x.username && !x.password ? x.href : null; }
+  catch (e) { return null; }
+}
+function workItem(r) {
+  const s = el("span"), a = el("a", "", "#" + r.number), href = githubLink(r.url);
+  if (href) { a.href = href; a.rel = "noopener noreferrer"; a.target = "_blank"; }
+  s.append(a);
+  if (r.stale) s.append(el("span", "badge b-warn", "stale"));
+  return s;
+}
+function renderWork(w, box) {
+  if (!w) { box.append(emptyState("Work items", "The work summary could not be loaded.")); return; }
+  const items = w.items || [], c = w.counts || {}, repos = w.repos || [], hide = !!w.hide_titles;
+  if (!items.length) {
+    box.append(emptyState("Work items", w.empty
+      ? "No work items read yet. Any gnomonkit work command (gnomonkit work list, for one) writes the summary this tab shows."
+      : "No open work items in " + (repos.map(r => r.repo).join(", ") || "the repositories read so far") + "."));
+    return;
+  }
+  box.append(tiles([[num(c.active || 0), "active", c.stale ? num(c.stale) + " with a stale claim" : "claimed by a session"],
+    [num(c.blocked || 0), "blocked", "waiting on something"], [num(c.review || 0), "in review", "waiting for a review"],
+    [num(c.open || 0), "open", "nobody holds it"]]));
+  const multi = repos.length > 1;
+  for (const [state, label, badge] of WORK_STATES) {
+    const rows = items.filter(r => r.state === state);
+    if (!rows.length) continue;
+    const claim = state === "active" && !hide;
+    const heads = ["Item"].concat(multi ? ["Repository"] : [], hide ? [] : ["Title"], claim ? ["Claimed by"] : [], ["Last activity", "Age"]);
+    const nc = [heads.length - 2, heads.length - 1];
+    const line = r => [workItem(r)].concat(multi ? [r.repo] : [], hide ? [] : [r.title],
+      claim ? [r.claimed_by ? r.claimed_by + (r.machine ? " on " + r.machine : "") : "—"] : [], [ago(r.idle_s), ago(r.age_s)]);
+    const head = el("span", "badge " + badge, label);
+    const p = panel(label + " (" + rows.length + ")");
+    p.querySelector("h2").replaceChildren(head, document.createTextNode(" " + rows.length));
+    p.append(table(heads, rows.slice(0, 10).map(line), nc));
+    if (rows.length > 10) p.append(fold(rows.length - 10 + " more", table(heads, rows.slice(10).map(line), nc)));
+    box.append(p);
+  }
+  box.append(el("p", "note", "Read from GitHub by gnomonkit work: " + repos.map(r => r.repo + (r.read_at ? " at " + r.read_at.replace("T", " ").slice(0, 16) + " UTC" : "")).join(", ")
+    + ". Any work command refreshes it; this page never calls GitHub and never shows an issue's body." + (hide ? " Titles and claims are hidden (hide_titles)." : "")));
+}
+
+// ---------------------------------------------------------------- trust (folder-trust levels, gnomonkit trust status)
+// Read-only: every change goes through gnomonkit trust sync or gnomonkit setup security in a terminal.
+const TRUST_STATE = {trusted: "b-ok", pending: "b-warn", "not trusted": "b-no-data", unknown: "b-no-data"};
+const LEVEL_BADGE = {trusted: "b-ok", "per-project": "b-no-data", never: "b-fail"};
+const LEVEL_NOTE = {"per-project": "Gnomonkit trusts nothing here; Claude Code asks per folder.",
+  never: "Gnomonkit trusts nothing here, and session-dispatch starts no session here."};
+function trustRoot(r) {
+  const p = panel(r.root);
+  p.querySelector("h2").append(document.createTextNode(" "), el("span", "badge " + (LEVEL_BADGE[r.level] || "b-no-data"), r.level));
+  p.append(el("p", "note", r.level === "trusted"
+    ? "Repositories whose origin belongs to " + ((r.owners || []).join(", ") || "nobody listed") + (r.local_only ? ", or with no remote," : "")
+      + " may be trusted. New clones are " + (r.auto ? "trusted at session start (auto)." : "trusted only by gnomonkit trust sync.")
+    : LEVEL_NOTE[r.level] || ""));
+  const repos = r.repos || [];
+  if (!r.exists) { p.append(el("p", "empty", "No such folder.")); return p; }
+  if (!repos.length) { p.append(el("p", "empty", "No repositories found under it.")); return p; }
+  const line = x => [x.name, el("span", "badge " + (TRUST_STATE[x.state] || "b-no-data"), x.state), x.reason || ""];
+  const heads = ["Repository", "State", "Why"];
+  p.append(table(heads, repos.slice(0, 10).map(line)));
+  if (repos.length > 10) p.append(fold(repos.length - 10 + " more", table(heads, repos.slice(10).map(line))));
+  return p;
+}
+function renderTrust(t, box) {
+  if (!t || t.error) { box.append(emptyState("Folder trust", (t && t.error) || "The trust levels could not be loaded.")); return; }
+  const lv = t.levels || {}, cc = t.claude_config || {}, roots = t.roots || [], unc = t.uncovered || [], c = t.counts || {};
+  if (lv.status === "missing") box.append(panel("Folder trust", el("p", "empty", "No levels set yet, so Gnomonkit trusts nothing for you and Claude Code asks per folder."),
+    cmdNote("Set them in a terminal:", "gnomonkit setup security")));
+  else if (lv.status !== "ok") { const w = el("div", "warnbox", "The levels file is " + lv.status + ", so Gnomonkit trusts nothing and session-dispatch refuses to start sessions.");
+    const ul = el("ul"); (lv.problems || []).forEach(x => ul.append(el("li", "", x))); w.append(ul); box.append(w, cmdNote("Fix it in an editor, or in a terminal:", "gnomonkit setup security")); }
+  if (!cc.ok) box.append(el("p", "warnbox", "Claude Code's file could not be read" + (cc.problem ? " (" + cc.problem + ")" : "") + ", so each repository's state is unknown."));
+  if (roots.length || unc.length) box.append(tiles([[num(roots.length), "roots", "in your [[trust]] tables"], [num(c.trusted || 0), "trusted", "repositories under a root"],
+    [num(c.pending || 0), "pending", "qualify, not trusted yet"], [num(c.uncovered || 0), "not covered", "trusted folders under no root"]]));
+  roots.forEach(r => box.append(trustRoot(r)));
+  if (c.pending) box.append(cmdNote("Pending repositories qualify under a trusted root. To trust them, run in a terminal:", "gnomonkit trust sync"));
+  if (unc.length) {
+    const heads = ["Parent folder", "Folders", "Names"];
+    const line = g => [g.parent, num((g.folders || []).length || 1), (g.folders || []).join(", ")];
+    const p = panel("Not covered by any root", el("p", "note", "Claude Code trusts these folders, but no [[trust]] root covers them, so no level applies. A parent that holds several is a root you may want to add with gnomonkit setup security."));
+    p.append(table(heads, unc.slice(0, 10).map(line), [1]));
+    if (unc.length > 10) p.append(fold(unc.length - 10 + " more", table(heads, unc.slice(10).map(line), [1])));
+    box.append(p);
+  }
+  if (t.complete === false) box.append(el("p", "note", "The scan stopped early (too many folders); gnomonkit trust status --depth N or a narrower root sees all of it."));
+  box.append(el("p", "note", "Read-only, from gnomonkit trust status. Changes go through gnomonkit trust sync and gnomonkit setup security in a terminal. Paths under your home folder are shown as ~."));
+}
+
+// ---------------------------------------------------------------- memory
+async function memorySearch(ev) {
+  ev.preventDefault();
+  const q = $("mq").value.trim(), out = $("mres");
+  if (!q) return;
+  out.replaceChildren(el("p", "empty", "Searching..."));
+  try {
+    const r = await api("/api/memory?q=" + encodeURIComponent(q));
+    out.replaceChildren();
+    if (r.error) { out.append(el("p", "warnbox", r.error)); return; }
+    if (!r.results.length) { out.append(el("p", "empty", "Nothing found for that search.")); return; }
+    r.results.forEach(h => { const d = el("div", "hit"); d.append(el("div", "h", "#" + h.rank + " · " + h.where + (h.source ? " · " + h.source : "") + (h.match ? " · " + h.match : "")), el("pre", "", h.snippet)); out.append(d); });
+  } catch (e) { out.replaceChildren(el("p", "warnbox", "Search failed (" + e.message + ").")); }
+}
+
+// ---------------------------------------------------------------- shell
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({credentials: "same-origin", headers: {"Accept": "application/json"}}, opts || {}));
+  if (r.status === 401) throw new Error("sign-in needed: reload with the login link");
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok && r.status !== 202) { const e = new Error(body.error || ("HTTP " + r.status)); e.body = body; e.status = r.status; throw e; }
+  return body;
+}
+const TABS = ["effectiveness", "readiness", "usage", "activities", "updates", "work", "trust", "memory"].filter(t => $("t-" + t));
+function show(name) {
+  if (!TABS.includes(name) || $("t-" + name).hidden) name = "effectiveness";
+  TABS.forEach(t => { $("t-" + t).setAttribute("aria-selected", String(t === name)); $("t-" + t).tabIndex = t === name ? 0 : -1; $("p-" + t).hidden = t !== name; });
+  if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+}
+TABS.forEach(t => $("t-" + t).addEventListener("click", () => show(t)));
+$("tabs").addEventListener("keydown", e => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const vis = TABS.filter(t => !$("t-" + t).hidden), i = vis.findIndex(t => $("t-" + t).getAttribute("aria-selected") === "true");
+  const n = vis[(i + (e.key === "ArrowRight" ? 1 : vis.length - 1)) % vis.length]; show(n); $("t-" + n).focus();
+});
+const THEMES = ["auto", "light", "dark"];
+function applyTheme(t) { if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t); $("theme").textContent = "Theme: " + t; }
+let theme = "auto"; try { theme = localStorage.getItem("gk-portal-theme") || "auto"; } catch (e) {}
+if (!THEMES.includes(theme)) theme = "auto";
+applyTheme(theme);
+$("theme").addEventListener("click", () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem("gk-portal-theme", theme); } catch (e) {} });
+
+let STATUS = null, POLL = null;
+function statusLine(s, meta) {
+  const r = s.refresh || {}, parts = [];
+  if (meta && meta.generated_at) parts.push("data from " + meta.generated_at.replace("T", " ").slice(0, 16) + " UTC" + (meta.since_days ? ", last " + meta.since_days + " days" : ""));
+  else parts.push("no data yet");
+  if (s.snapshot_at) parts.push("static snapshot taken " + s.snapshot_at.replace("T", " ").slice(0, 16) + " UTC");
+  if (r.running) parts.push("refreshing now...");
+  else if (r.finished_at) parts.push("last refresh " + (r.ok ? "ok" : "failed: " + (r.error || "unknown")) + " (" + (r.trigger || "?") + ", " + r.finished_at.replace("T", " ").slice(0, 16) + ")");
+  $("status").textContent = parts.join(" · ");
+  const btn = $("refresh");
+  if (!btn) return;
+  btn.disabled = !!r.running || r.retry_after > 0;
+  btn.textContent = r.running ? "Refreshing..." : r.retry_after > 0 ? "Refresh in " + Math.ceil(r.retry_after / 60) + " min" : "Refresh data";
+}
+async function load() {
+  let s, m, w, tr;
+  if (SNAP) {
+    try { const d = JSON.parse(SNAP.textContent); s = d.status || {}; m = d.metrics || {}; tr = d.trust || null; }
+    catch (e) { $("status").textContent = "The snapshot's data could not be read."; return; }
+  } else {
+    try { [s, m, w] = await Promise.all([api("/api/status"), api("/api/metrics"), api("/api/work").catch(() => null)]); }
+    catch (e) { $("status").textContent = "Could not load: " + e.message; return; }
+  }
+  STATUS = s;
+  if ($("t-memory")) $("t-memory").hidden = !s.memory;
+  if ($("mnote")) $("mnote").textContent = (s.memory_source === "history"
+    ? "Read-only search of Gnomonkit core's local history index (words, not meanings). "
+    : "Read-only search through the local mempalace CLI. ")
+    + "Snippets are cut short and long token-like strings are masked.";
+  if ($("signout")) $("signout").hidden = s.auth !== "token";
+  const sec = m.sections || {}, meta = m.meta || {};
+  for (const [id, fn] of [["effectiveness", renderEffectiveness], ["readiness", renderReadiness], ["usage", renderUsage], ["activities", renderActivities]]) {
+    const box = $("p-" + id); box.replaceChildren();
+    try { fn(sec[id], box, meta); } catch (e) { box.append(el("p", "warnbox", "This tab could not be drawn (" + e.message + ").")); }
+  }
+  // The Updates tab has its own endpoint; an older or failing server leaves only this tab empty.
+  // A static snapshot has no Updates tab (it is live-only) and asks nothing.
+  const ub = $("p-updates");
+  if (ub && !SNAP) {
+    ub.replaceChildren();
+    try { renderUpdates(await api("/api/sync"), ub); }
+    catch (e) { ub.append(el("p", "warnbox", "Updates could not be loaded (" + e.message + ").")); }
+  }
+  // The Work tab is live-only too: a snapshot carries no work summary.
+  const wbox = $("p-work");
+  if (wbox && !SNAP) {
+    wbox.replaceChildren();
+    try { renderWork(w, wbox); } catch (e) { wbox.append(el("p", "warnbox", "This tab could not be drawn (" + e.message + ").")); }
+  }
+  // The Trust tab names this machine's folders: loopback only on a live page (a token or a proxy gets the
+  // terminal command instead), and in a snapshot only when it was written with --trust.
+  const tb = $("p-trust");
+  $("t-trust").hidden = !!SNAP && !tr;
+  tb.replaceChildren();
+  try {
+    if (SNAP) { if (tr) renderTrust(tr, tb); }
+    else if (s.trust) renderTrust(await api("/api/trust"), tb);
+    else tb.append(emptyState("Folder trust", "Shown only on the portal at this machine's loopback address, because it names local folders. Run gnomonkit trust status in a terminal on that machine instead."));
+  } catch (e) { tb.append(el("p", "warnbox", "Trust levels could not be loaded (" + e.message + ").")); }
+  statusLine(s, meta);
+  show(location.hash.slice(1));
+  if (!SNAP && s.refresh && s.refresh.running && !POLL) POLL = setInterval(poll, 5000);
+}
+async function poll() {
+  try { const s = await api("/api/status"); if (!s.refresh.running) { clearInterval(POLL); POLL = null; await load(); } else statusLine(s, null); } catch (e) {}
+}
+if ($("refresh")) $("refresh").addEventListener("click", async () => {
+  try { await api("/api/refresh", {method: "POST"}); $("status").textContent = "Refresh started. A first run over a long history can take several minutes.";
+    if (!POLL) POLL = setInterval(poll, 5000); $("refresh").disabled = true; $("refresh").textContent = "Refreshing..."; }
+  catch (e) { $("status").textContent = "Refresh not started: " + e.message + (e.body && e.body.retry_after ? " (try again in " + Math.ceil(e.body.retry_after / 60) + " min)" : ""); }
+});
+if ($("mform")) $("mform").addEventListener("submit", memorySearch);
+load();
+</script>
+</body></html>

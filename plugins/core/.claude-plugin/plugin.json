@@ -1,0 +1,72 @@
+{
+  "name": "core",
+  "description": "Gnomonkit core: working discipline for AI coding agents. A one-time, skippable first-run setup that saves your preferences to a personal profile (no overlay needed), asks once per machine whether it is a personal or a work machine, and the gnomonkit command that shows and changes it, and makes, converts, checks and connects a private overlay of your own rules (overlay-setup). A local, searchable index of your past sessions (Python and SQLite only, secrets scrubbed before anything is stored) with a recall skill, and a lessons register you add to at session close, shown at session start, matched to each prompt and before a file's first edit, with no external memory tool. Orchestration grants that say which projects a session may start, hand off to, message or stop sessions in (default deny, set only by you in a terminal with gnomonkit setup security or gnomonkit grants), with a guard hook that keeps agents from editing them or Claude Code's folder-trust record and from starting, messaging or stopping sessions they don't cover. Folder-trust levels per root (trusted, per-project or never): `gnomonkit trust sync` in a terminal marks the repositories under a trusted root trusted in Claude Code, and a session-start hook trusts new clones there whose owner you list, changing only that one key, with a backup and an audit line. Safety hooks that stop irreversible commands until the target is enumerated and catch shell heredocs that break on escapes, a session-start line when a plugin update is pending, a sync gate that moves your installed copy of a plugin source only over commits signed by keys you approved and holds anything else for review by pull request in your overlay, plus skills for verifying before asserting, building only what is missing, reviewing diffs, update and dependency discipline, licence audits, detector calibration, web page baselines, project layout and context routing, enumerating before destroying, decommission order, production-impact callouts, shipping through PRs and merge guidance, batch conflict checks, environment audits, session close, silent no-op detection, alert routing, state and type-safety traps, performance by default, visible background work, less on screen, report pages that collect a verdict per item (with a prompt hook that points data breakdowns, comparisons and rankings at them), driving your own QA, documents in the user's voice, learned corrections, repeated user corrections filed as learned-trigger issues in a private repo, Windows development traps, traps in the agent's own tooling, release-pipeline traps, token efficiency with a context-budget and compaction-count watch, a once-per-session delegation check and a compaction carry-over that re-injects open PRs, running tasks and subagents, edited files and pending questions after a compact, measuring whether the setup pays off (subagent spend against the context each spawn kept out of the parent, output-digest savings, hook uptake, launch-readiness metrics against targets, token usage per day, project and session with an API-equivalent cost), scripting or making a skill of any multi-step process that comes round again, with a detector that ranks the command sequences and requests repeated across your local transcripts, where a rule lives across the shared core, your private overlay and one project, work items on GitHub (issues labelled gk:work, read and changed with `gnomonkit work`: open, claim, note, next step, state, close; claimed items survive compaction and session close updates them), and keeping the local disk tidy: an inventory of every clone, worktree and folder with a verdict each, reversible cleanup of what you approve, and one labelled home for every folder an agent makes.",
+  "version": "1.7.4",
+  "userConfig": {
+    "personal_profile": {
+      "type": "file",
+      "title": "Personal profile",
+      "description": "Path to your personal profile, for example profile/personal.toml in a private overlay so it follows you between machines. Optional: without it Gnomonkit reads ~/.gnomonkit/personal.toml, which first-run setup and `gnomonkit profile set` write. See docs/PROFILES.md.",
+      "required": false
+    },
+    "corrections_repo": {
+      "type": "string",
+      "title": "Corrections repo",
+      "description": "A PRIVATE GitHub repo (owner/name), usually your overlay, where corrections you have to repeat become learned-trigger issues; each repeat adds a comment, so the count is the priority. Wins over the profile's corrections.repo. Optional: without either, nothing is filed.",
+      "required": false
+    },
+    "scratch_root": {
+      "type": "string",
+      "title": "Scratch folder",
+      "description": "Where agents put QA data, test copies and other throwaway folders (folder-placement). Wins over the profile's paths.scratch_root. Optional: defaults to ~/.gnomonkit/scratch.",
+      "required": false
+    },
+    "digest_command": {
+      "type": "string",
+      "title": "Output-digest command",
+      "description": "The command name of a wrapper you run long commands through so it prints a digest instead of the whole output, for the effectiveness collector to measure. Optional: unset, digests are not tracked.",
+      "required": false
+    },
+    "subscription_file": {
+      "type": "file",
+      "title": "Subscription schedule",
+      "description": "A JSON file listing what you pay for your plan, as [{\"from\": \"YYYY-MM\", \"plan\": \"<label>\", \"monthly_usd\": <number>}], one entry per change. The effectiveness collector sets it against the API-equivalent cost of your usage. Optional: defaults to ~/.gnomonkit/subscription.json; without a file only API-equivalent figures are shown.",
+      "required": false
+    },
+    "context_budget": {
+      "type": "number",
+      "title": "Context budget (tokens)",
+      "description": "When the main session's context reaches this many tokens, the context_watch hook says to write the handoff and then /compact or start a fresh session, again every further 100k. Wins over the profile's context.context_budget. Optional: defaults to 250000; 0 turns it off.",
+      "required": false
+    },
+    "max_compactions": {
+      "type": "number",
+      "title": "Compactions before a fresh session",
+      "description": "Auto-compaction may happen; once a session has been compacted automatically this many times, the context_watch hook asks Claude to write the session handoff, and says whether you can still /compact (see manual_compactions) or should start a fresh session, again at each further compaction. Wins over the profile's context.max_compactions. Optional: defaults to 2; 0 turns it off.",
+      "required": false
+    },
+    "manual_compactions": {
+      "type": "number",
+      "title": "Manual compactions allowed",
+      "description": "How many of your own /compact runs a session may take on top of the automatic ones before a fresh session is recommended. Wins over the profile's context.manual_compactions. Optional: defaults to 1.",
+      "required": false
+    },
+    "work_repo": {
+      "type": "string",
+      "title": "Work-items repo",
+      "description": "A PRIVATE GitHub repo (owner/name), usually your overlay, that holds the work items (gk:work issues) for work that crosses projects or has no private repo of its own. Wins over the profile's work.repo. Optional: without either, work items live only in a project's own private repo.",
+      "required": false
+    },
+    "cleanup_roots": {
+      "type": "string",
+      "title": "Folders to inventory",
+      "description": "Folders local-compare lists one level deep, separated by ';' on Windows or ':' elsewhere (e.g. your projects folder and a drive root). Optional: defaults to the folder holding the current repo, plus its drive root on Windows.",
+      "required": false
+    }
+  },
+  "author": {
+    "name": "Gnomonkit contributors"
+  },
+  "homepage": "https://github.com/joshualytle/Gnomonkit",
+  "license": "MIT"
+}

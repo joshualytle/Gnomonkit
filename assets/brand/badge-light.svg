@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Gnomonkit: a garden gnome holding a wrench beside a toolbox">
+  <circle cx="128" cy="128" r="120" fill="#ffffff" stroke="#139c8c" stroke-width="10"/>
+  <ellipse cx="124" cy="200" rx="80" ry="15" fill="#dfe6e3"/>
+  <g transform="translate(139 168) rotate(14)">
+    <rect x="-3.2" y="-40" width="6.4" height="44" rx="3" fill="#b9c3c7"/>
+    <circle cx="0" cy="-44" r="10" fill="#b9c3c7"/>
+    <rect x="-3.6" y="-58" width="7.2" height="13" rx="1" fill="#ffffff"/>
+    <rect x="-1" y="-36" width="2" height="34" rx="1" fill="#8a979c"/>
+  </g>
+  <g transform="translate(112 198) scale(1.55)">
+    <ellipse cx="-8" cy="0" rx="8.5" ry="4.5" fill="#5a3b26"/>
+    <ellipse cx="8" cy="0" rx="8.5" ry="4.5" fill="#5a3b26"/>
+    <path d="M-15 -2 Q-17 -30 0 -36 Q17 -30 15 -2 Z" fill="#2f5f95"/>
+    <rect x="-15" y="-14" width="30" height="4" fill="#3b2a1e"/>
+    <circle cx="-17" cy="-20" r="5" fill="#f3c8a2"/>
+    <path d="M-14 -46 Q-16 -24 0 -10 Q16 -24 14 -46 Z" fill="#f8f6f0" stroke="#d3d9d6" stroke-width="0.8"/>
+    <circle cx="0" cy="-52" r="12" fill="#f3c8a2"/>
+    <circle cx="-5" cy="-54" r="1.8" fill="#1d1a18"/>
+    <circle cx="5" cy="-54" r="1.8" fill="#1d1a18"/>
+    <circle cx="0" cy="-49" r="4.4" fill="#f08a78"/>
+    <path d="M-17 -58 L0 -94 L17 -58 Q0 -62 -17 -58 Z" fill="#e2382f"/>
+    <path d="M0 -94 L17 -58 Q8 -60 4 -60 Z" fill="#b92a23"/>
+    <circle cx="17" cy="-22" r="5" fill="#f3c8a2"/>
+  </g>
+  <path d="M170 166 v-9 a5 5 0 0 1 5 -5 h22 a5 5 0 0 1 5 5 v9" fill="none" stroke="#3b2a1e" stroke-width="5"/>
+  <rect x="158" y="164" width="56" height="36" rx="5" fill="#1fb5a4"/>
+  <rect x="158" y="164" width="56" height="10" rx="3" fill="#168e81"/>
+  <rect x="180" y="172" width="12" height="9" rx="2" fill="#f2c230"/>
+</svg>

@@ -1,0 +1,15 @@
+# Never ignore private/, profile/, evidence/ or lessons/: keeping them is what this repository is for.
+
+# Backups that `gnomonkit profile set` keeps beside the profile, and local caches
+*.bak
+__pycache__/
+*.pyc
+
+# Local secrets never belong in any repository, private or not
+.env
+.env.*
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini

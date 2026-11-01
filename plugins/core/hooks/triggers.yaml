@@ -1,0 +1,487 @@
+# Deterministic skill triggers -- THE single source for the rules, the
+# suggestion text AND the fixtures that test them.
+#
+# WHY DETERMINISTIC AND NOT SEMANTIC. Retrieval-based routing -- indexing
+# every skill description in a memory store and searching it with the user's
+# intent -- asks the wrong question. A retrieval model answers "does this
+# text contain the answer"; choosing a skill asks "is this the right
+# procedure right now". Matching on a file path or a command does not need to
+# understand the request at all, which is why it works.
+#
+# EVERY `when` IS QUOTED FROM THE SKILL'S OWN DESCRIPTION. The trigger is not my
+# guess about when a skill applies -- it is the author's stated activation
+# condition, turned into a pattern. If a trigger is wrong, the fix belongs in
+# the skill's description first, and here second.
+#
+# SCOPE. `repos` limits a rule to repositories where the skill applies. A
+# project-specific skill scoped to one codebase may never fire because that
+# work has not happened in your sessions -- that is not a routing failure, and
+# firing them everywhere would manufacture noise to fix a problem that is not
+# there.
+#
+# FIXTURES ARE NOT OPTIONAL. `fire` must trigger, `quiet` must not. A trigger
+# with no quiet fixture is a trigger nobody has checked for false positives,
+# and a router that cries wolf is worse than no router: it trains the reader to
+# dismiss it, which is exactly what the destructive interlock must never become.
+
+triggers:
+
+  - skill: diff-review
+    when: >
+      "before a feature-labelled commit, or when reading someone else's branch"
+    tools: [Bash, PowerShell]
+    command_patterns:
+      - 'git\s+commit\b[^|;]*-m\s*["'']?\s*(feat|fix)\s*[(:]'
+      - 'gh\s+pr\s+(checkout|diff)\b'
+    say: >
+      This is a feature-labelled commit or someone else's branch. diff-review
+      separates must-fix from nice-to-have and hunts swallowed failures.
+    fixtures:
+      fire:
+        - 'git commit -m "feat(auth): add token refresh"'
+        - 'git commit -m "fix(api): null guard"'
+        - 'gh pr checkout 214'
+      quiet:
+        - 'git commit -m "docs: typo"'
+        - 'git status'
+        - 'gh pr list'
+        - 'echo "git commit -m feat(x): y"'
+
+  - skill: package-manager-pinning
+    when: >
+      "changing a package manager or its version, adding a packageManager
+      field, moving a build-script allow-list"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])package\.json$'
+      - '(^|[/\\])(pnpm-lock\.yaml|yarn\.lock|package-lock\.json)$'
+      # NOT Dockerfile[^/\\]*$ -- that also matched `dockerfile-notes.md`,
+      # because the suffix is unconstrained. An optional extension matches
+      # Dockerfile and Dockerfile.prod without swallowing prose about one.
+      - '(^|[/\\])Dockerfile(\.[A-Za-z0-9]+)?$'
+      - '(^|[/\\])requirements[^/\\]*\.txt$'
+      - '(^|[/\\])(go\.mod|Cargo\.toml|pyproject\.toml)$'
+    say: >
+      A package manager or dependency manifest is changing. Pin the version and
+      prefer a digest; an unpinned manager is how a CI install starts failing
+      for reasons unrelated to the change being made.
+    fixtures:
+      fire:
+        - 'C:\Projects\app\package.json'
+        - 'services/api/Dockerfile'
+        - 'requirements-dev.txt'
+      quiet:
+        - 'src/package.json.bak'
+        - 'docs/dockerfile-notes.md'
+        - 'README.md'
+
+  - skill: dependency-licence-audit
+    when: >
+      "adding or updating any dependency - a package, a native library, a build
+      flag that changes what links, an AI model, a font or asset, a vendored
+      source tree, a base image"
+    tools: [Write, Edit]
+    # Manifests package-manager-pinning already watches (package.json, the
+    # Python/Go/Rust manifests, Dockerfiles) are deliberately NOT repeated here:
+    # one suggestion per edit. These are the dependency definitions it does not
+    # cover, the native build files above all, where a default flag can link a
+    # runtime nobody chose.
+    path_patterns:
+      - '(^|[/\\])(pubspec\.yaml|vcpkg\.json|meson\.build)$'
+      - '(^|[/\\])(CMakeLists\.txt|conanfile\.(txt|py))$'
+    say: >
+      A dependency manifest or build definition is changing. Before it lands,
+      check the licence of everything the built artefacts now load, not just
+      the package chosen; anything copyleft, GPL-with-exception, non-commercial
+      or custom goes to the owner first.
+    fixtures:
+      fire:
+        - 'C:\Projects\app\pubspec.yaml'
+        - 'native/CMakeLists.txt'
+        - 'vcpkg.json'
+        - 'third_party/lib/meson.build'
+      quiet:
+        - 'docs/cmakelists-notes.md'
+        - 'pubspec.yaml.orig'
+        - 'README.md'
+
+  - skill: silent-no-op
+    when: >
+      "building or reviewing any loop, batch job, reconciliation or scheduled
+      automation, and whenever a run succeeded but the expected side effect is
+      missing"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])(cron|jobs?|schedules?|processors)[/\\]'
+      - '(^|[/\\])[^/\\]*(cronjob|scheduled|nightly|weekly|batch)[^/\\]*\.(py|ps1|ya?ml|ts|js)$'
+      - '(^|[/\\])Install-Schedule\.ps1$'
+    say: >
+      Scheduled or batch work: check item COUNTS, not exit status. A job that
+      finishes green may have processed nothing.
+    fixtures:
+      fire:
+        - 'plugins/memory/processors/nightly.py'
+        - 'clusters/prod/apps/backup-cronjob.yaml'
+        - 'scripts/Install-Schedule.ps1'
+      quiet:
+        - 'src/components/Button.tsx'
+        - 'docs/scheduling.md'
+
+  - skill: production-impact-callout
+    when: >
+      "writing a runbook, checklist or deploy step, or about to run an action
+      that can interrupt the live product: a firewall reload, a container or
+      daemon restart, a DNS, tunnel or access change, a live workflow publish,
+      a migration on live tables, a deploy that serves traffic"
+    tools: [Write, Edit, Bash]
+    path_patterns:
+      - '(^|[/\\])(runbooks?|ops|deploy|infra|migrations?)[/\\]'
+      - '(^|[/\\])[^/\\]*(runbook|checklist|next[-_]steps|owner[-_]steps|promotion|rollout)[^/\\]*\.(md|html|sh|ps1|ya?ml)$'
+    say: >
+      A step that can touch the live product says what it affects, for how
+      long and whether it needs a quiet window, and is verified from outside
+      afterwards. Firewall reloads, restarts, tunnel and DNS changes, live
+      workflow publishes and live-table migrations always get the note.
+    fixtures:
+      fire:
+        - 'docs/ops/vps/README.md'
+        - 'db/migrations/0042_add_example_column.sql'
+        - 'ops/runbooks/tunnel-restart.md'
+        - 'scratch/owner_next_steps.html'
+      quiet:
+        - 'src/components/Button.tsx'
+        - 'docs/features/renaming.md'
+
+  - skill: owner-decides-claims
+    when: >
+      "before writing any product claim, price, launch status, platform or
+      integration list, compliance or security assertion, legal and policy
+      text, competitor comparison, or biographical fact"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])(pricing|plans?|compare|comparison|competitors?)[^/\\]*\.(html|md|mdx|tsx|jsx|astro|json)$'
+      - '(^|[/\\])(privacy|terms|legal|compliance|security)[^/\\]*\.(html|md|mdx|tsx|astro)$'
+      - '(^|[/\\])(about|team|bio)[^/\\]*\.(html|md|mdx|tsx|astro)$'
+    say: >
+      This page carries claims no amount of searching the repo can settle --
+      price, compliance, competitor or biographical fact. Those are the owner's
+      to decide, not mine to infer.
+    fixtures:
+      fire:
+        - 'site/src/pages/pricing.astro'
+        - 'www/compare-competitors.html'
+        - 'content/privacy.md'
+      quiet:
+        - 'src/lib/pricing-calculator.ts'
+        - 'tests/pricing.test.ts'
+
+  - skill: copy-discipline
+    when: >
+      "writing or editing user-facing copy - headlines, feature blurbs,
+      marketing pages, product descriptions, release notes"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])(content|copy|marketing|blog|posts?)[/\\]'
+      - '(^|[/\\])(CHANGELOG|RELEASE[-_ ]?NOTES)[^/\\]*\.md$'
+      - '(^|[/\\])(landing|hero|home|index)[^/\\]*\.(html|mdx|astro)$'
+    # content/ legitimately holds legal text and pricing pages, which belong
+    # to owner-decides-claims. Without this both rules fire on one edit, and
+    # two suggestions per edit is how a channel becomes wallpaper.
+    exclude_patterns:
+      - '(privacy|terms|legal|compliance|security|pricing|compare)'
+    say: >
+      User-facing copy. Write it once and reference it -- the same sentence,
+      address or URL typed into a second file is the thing that later drifts.
+    fixtures:
+      fire:
+        - 'site/content/blog/launch.md'
+        - 'CHANGELOG.md'
+        - 'web/src/pages/landing.astro'
+      quiet:
+        - 'src/content-loader.ts'
+        - 'docs/architecture.md'
+
+  - skill: claude-project-format
+    when: >
+      the file that tells every future session how to work in this repo
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])(CLAUDE|AGENTS)\.md$'
+    say: >
+      Editing the repo's agent instructions. Format and placement decide
+      whether later sessions actually read this.
+    fixtures:
+      fire:
+        - 'C:\Projects\app\CLAUDE.md'
+        - 'AGENTS.md'
+      quiet:
+        - 'docs/claude-notes.md'
+        - 'README.md'
+
+  - skill: windows-dev-traps
+    when: >
+      PowerShell and Windows-specific behaviour that silently differs
+    tools: [Write, Edit]
+    path_patterns:
+      - '\.ps1$'
+      - '\.psm1$'
+    # A scheduled-job script is a .ps1 AND a batch job, and both rules have a
+    # real claim on it. silent-no-op is the more specific and the more costly
+    # to miss, so it keeps these; firing both would put two suggestions on one
+    # edit, which is the failure mode this whole channel is guarding against.
+    exclude_patterns:
+      - '(cron|schedule|nightly|weekly|batch)'
+    say: >
+      A PowerShell script. 5.1 has no && or ternary, native stderr
+      redirection fakes failures, and Set-Content defaults to ANSI.
+    fixtures:
+      fire:
+        - 'scripts/Deploy-App.ps1'
+        - 'modules/Helpers.psm1'
+      quiet:
+        - 'scripts/deploy.sh'
+        - 'docs/powershell-guide.md'
+
+  - skill: ship-through-prs
+    when: >
+      opening a pull request, or pushing a branch that will become one
+    tools: [Bash, PowerShell]
+    command_patterns:
+      - 'gh\s+pr\s+create\b'
+      - 'git\s+push\s+(-u|--set-upstream)\b'
+    say: >
+      Opening a PR. The gates only run on the PR, so what lands here is
+      what reviewers and CI actually see.
+    fixtures:
+      fire:
+        - 'gh pr create --fill --base dev'
+        - 'git push -u origin feat/thing'
+      quiet:
+        - 'git push'
+        - 'gh pr status'
+
+  - skill: merged-is-not-shipped
+    when: >
+      a merge is not a deploy, and green CI is not a running service
+    tools: [Bash, PowerShell]
+    command_patterns:
+      - 'gh\s+pr\s+merge\b'
+    say: >
+      Merging is not shipping. Confirm the thing is actually running
+      where users are before calling it done.
+    fixtures:
+      fire:
+        - 'gh pr merge 214 --squash'
+      quiet:
+        - 'gh pr view 214'
+
+  # A skill from a pack that is enabled only in some repos gets a trigger
+  # scoped to those repos (`repos:`). Unscoped, it fires on test fixtures and
+  # on repos where the skill is not installed.
+
+  - skill: alert-routing
+    when: >
+      "an alert nobody reads is not an alert"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])[^/\\]*(alertmanager|alert-rules|alerting)[^/\\]*\.ya?ml$'
+      - '(^|[/\\])(alerts|rules)[/\\][^/\\]*\.ya?ml$'
+    say: >
+      Alert configuration. Every alert needs a destination scoped to the
+      product and environment it belongs to.
+    fixtures:
+      fire:
+        - 'clusters/prod/monitoring/alertmanager-config.yaml'
+        - 'observability/alerts/latency.yml'
+      quiet:
+        - 'docs/alerting.md'
+        - 'src/alerts.ts'
+
+  - skill: release-pipeline-traps
+    when: >
+      release automation that succeeds while shipping nothing
+    tools: [Write, Edit]
+    path_patterns:
+      # (^|[/\\]) not [/\\] -- a repo-relative path begins `.github/...` with
+      # no leading separator, so the stricter anchor never matched the most
+      # common way this file is referenced.
+      - '(^|[/\\])\.github[/\\]workflows[/\\][^/\\]*(release|publish|deploy)[^/\\]*\.ya?ml$'
+    say: >
+      A release workflow. These fail in ways that still report green.
+    fixtures:
+      fire:
+        - '.github/workflows/release.yml'
+        - '.github/workflows/publish-npm.yaml'
+      quiet:
+        - '.github/workflows/test.yml'
+
+  - skill: tailwind-layer-discipline
+    when: >
+      utility classes losing to un-layered CSS
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])tailwind\.config\.[jt]s$'
+    say: >
+      Tailwind config. Un-layered custom CSS silently outranks utilities.
+    fixtures:
+      fire:
+        - 'tailwind.config.js'
+        - 'apps/web/tailwind.config.ts'
+      quiet:
+        - 'postcss.config.js'
+
+  - skill: secret-safe-inspection
+    when: >
+      checking a credential's configuration without revealing its value
+    tools: [Bash, PowerShell]
+    command_patterns:
+      - 'kubectl\s+get\s+secret\b'
+      - 'kubectl\s+describe\s+secret\b'
+    say: >
+      Inspect a secret's shape, never its value. Check config indirectly
+      rather than decoding .data.
+    fixtures:
+      fire:
+        - 'kubectl get secret app-creds -o yaml'
+      quiet:
+        - 'kubectl get pods'
+
+  - skill: report-pages
+    when: >
+      "writing an HTML page or a report-shaped Markdown file for someone to read"
+    tools: [Write, Edit]
+    scratchpad: true
+    path_patterns:
+      # Report-shaped names only. A bare index.html or README.md is a site or a doc, not an answer.
+      - '(^|[/\\])[^/\\]*(report|summary|status|findings|results?|review|audit|decisions?|comparison|breakdown)[^/\\]*\.(html|md)$'
+    say: >
+      This looks like an answer someone will read. report-pages: start from its
+      template, answer first, a verdict per item, readable on a phone; publish it
+      so answers come back to you instead of as prose.
+    fixtures:
+      fire:
+        - 'C:\Users\me\AppData\Local\Temp\claude\scratch\disk-usage-report.html'
+        - 'scratchpad/findings.md'
+        - 'reports/weekly-status.md'
+        - 'docs/review-results.html'
+        - 'out/open-decisions.html'
+      quiet:
+        - 'README.md'
+        - 'src/report.py'
+        - 'site/index.html'
+        - 'docs/architecture.md'
+        - 'tests/test_status.py'
+
+  - skill: folder-placement
+    when: >
+      "before creating a folder outside the current repo - a worktree, a clone,
+      QA or test data ... whenever a command would create a folder at a drive
+      root, in the home folder or directly in the projects folder"
+    tools: [Bash, PowerShell]
+    command_patterns:
+      - 'git\s+worktree\s+add\b'
+      - 'git\s+clone\b'
+      # A folder made directly under a drive root: C:\name, C:/name or /c/name, and nothing deeper.
+      - '\b(mkdir|md|New-Item)\b[^|;&]*?\s["'']?([A-Za-z]:[\\/]|/[a-z]/)[^\\/\s"'']+[\\/]?["'']?(\s|$)'
+    say: >
+      A folder is being made outside the repo. folder-placement: worktrees go in
+      the harness's worktree folder or <repo>.worktrees/<task>, scratch and QA
+      data in the scratch root via make_scratch.py, never at a drive root, and
+      every folder gets a label so cleanup can tell it from the user's own.
+    fixtures:
+      fire:
+        - 'git worktree add ../app-feat -b feat/x'
+        - 'git clone https://example.invalid/org/repo.git ../repo-copy'
+        - 'mkdir C:\qa-run'
+        - 'New-Item -ItemType Directory -Path "C:\fresh-install"'
+        - 'mkdir -p /c/qa-run'
+      quiet:
+        - 'mkdir src\components'
+        - 'mkdir C:\Projects\app\build'
+        - 'mkdir -p /c/Projects/app/out'
+        - 'git worktree list'
+        - 'git status'
+
+  - skill: local-cleanup
+    when: >
+      "removing local folders, clones or worktrees, running git worktree remove
+      or prune, deleting a scratch or QA data folder, freeing disk space"
+    tools: [Bash, PowerShell]
+    command_patterns:
+      - 'git\s+worktree\s+(remove|prune)\b'
+      - '\brmdir\s+/s\b'
+    say: >
+      Something local is being removed. local-cleanup: inventory first, act only
+      on what the user marked, and move to holding (restorable) instead of
+      deleting; never --force past a refusal.
+    fixtures:
+      fire:
+        - 'git worktree remove ../app-feat'
+        - 'git worktree prune'
+        - 'rmdir /s /q C:\qa-run'
+      quiet:
+        - 'git worktree list'
+        - 'git worktree add ../x -b y'
+        - 'rmdir emptydir'
+
+  - skill: local-compare
+    when: >
+      "the user says the disk is full, messy ... asks which local folders,
+      clones or worktrees are still needed"
+    tools: [Bash, PowerShell]
+    command_patterns:
+      # Measuring folder sizes is the moment someone is asking what is taking the space.
+      - '\bdu\s+-[a-zA-Z]*s'
+      - 'Measure-Object\b[^|;]*\bLength\b[^|;]*-Sum'
+    say: >
+      Folder sizes are being measured. local-compare: local_inventory.py lists
+      every clone, worktree and folder with its branch, unpushed and merge state,
+      size and a safe / review / keep verdict, in one pass.
+    fixtures:
+      fire:
+        - 'du -sh /c/Projects/*'
+        - 'Get-ChildItem C:\qa-data -Recurse -File | Measure-Object Length -Sum'
+      quiet:
+        - 'du --version'
+        - 'Get-Content log.txt | Measure-Object -Line'
+
+  - skill: onboarding
+    when: >
+      "before writing or editing a personal.toml profile or Gnomonkit's
+      onboarding.json by hand"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])personal\.toml$'
+      - '(^|[/\\])\.gnomonkit[/\\](onboarding\.json|machine\.toml|subscription\.json)$'
+    say: >
+      A Gnomonkit profile file is being written by hand. onboarding: save
+      values with `gnomonkit profile set key=value`, which checks each one,
+      keeps a .bak copy and writes nothing when a value is wrong.
+    fixtures:
+      fire:
+        - '~/.gnomonkit/personal.toml'
+        - 'profile/personal.toml'
+        - '~/.gnomonkit/onboarding.json'
+      quiet:
+        - '~/.gnomonkit/personal.toml.bak'
+        - 'docs/personal-profile.md'
+        - 'src/onboarding.json'
+
+  - skill: overlay-setup
+    when: >
+      "before writing a gnomonkit-overlay.toml marker or an overlay's
+      marketplace by hand"
+    tools: [Write, Edit]
+    path_patterns:
+      - '(^|[/\\])gnomonkit-overlay\.toml$'
+    say: >
+      A Gnomonkit overlay marker is being written by hand. overlay-setup:
+      `gnomonkit overlay init` or `convert --apply` writes the marker and the
+      manifests together, and `gnomonkit overlay check` validates the layout.
+    fixtures:
+      fire:
+        - 'gnomonkit-overlay.toml'
+        - '~/projects/my-overlay/gnomonkit-overlay.toml'
+      quiet:
+        - 'docs/gnomonkit-overlay.md'
+        - 'gnomonkit-overlay.toml.example'

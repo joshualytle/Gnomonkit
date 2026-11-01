@@ -1,0 +1,66 @@
+# Text people write on the public repository: issues, pull request titles and bodies, comments and
+# reviews. Code reaches the public repository only through signed releases, but this text is posted
+# by hand and is public the moment it is saved, so it is scanned on every create and edit.
+#
+# A hit cannot stop the post; it fails this run, GitHub notifies the maintainer, and the log shows
+# only `field: category`, so the maintainer can hide or edit the text quickly.
+#
+# Runs only when the repository is public (the private development repository holds working notes
+# this would flag). pull_request_target is used so a fork's pull request text is checked with the
+# denylist; it never checks out or runs the pull request's code, only the base branch's scripts.
+name: public-text
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  pull_request_target:
+    types: [opened, edited, reopened]
+  pull_request_review:
+    types: [submitted, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+  discussion:
+    types: [created, edited]
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Write the private denylist to a temp file
+        env:
+          DENYLIST: ${{ secrets.GNOMONKIT_DENYLIST }}
+        run: |
+          printf '%s\n' "$DENYLIST" > "$RUNNER_TEMP/denylist.txt"
+          echo "GNOMONKIT_DENYLIST=$RUNNER_TEMP/denylist.txt" >> "$GITHUB_ENV"
+
+      # The text is read from the event file, never interpolated into the script or passed via env:
+      # (the log prints a step's env, which would put the flagged text into the public run log).
+      - name: leakcheck + provenance (the text that was posted)
+        run: |
+          python3 - <<'PY'
+          import json, os
+          e = json.load(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8"))
+          parts = []
+          for key in ("issue", "pull_request", "comment", "review", "discussion"):
+              obj = e.get(key) or {}
+              if key == "issue" and "comment" in e:
+                  continue  # a comment event carries its issue too; only the new comment is new text
+              parts += [obj.get("title") or "", obj.get("body") or ""]
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "posted.md"), "w", encoding="utf-8") as f:
+              f.write("\n".join(parts) + "\n")
+          PY
+          python3 scripts/leakcheck.py --stdin posted-text < "$RUNNER_TEMP/posted.md"
+          python3 scripts/provenance_check.py --stdin posted-text < "$RUNNER_TEMP/posted.md"

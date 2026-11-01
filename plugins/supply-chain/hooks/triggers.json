@@ -1,0 +1,54 @@
+{
+  "triggers": [
+    {
+      "skill": "patch-review",
+      "when": "\"adding, upgrading or bumping a dependency (npm, pnpm or yarn add or update, pip or uv upgrade, poetry add or update, cargo add or update, dart or flutter pub upgrade), or reviewing a Dependabot or Renovate pull request\"\n",
+      "tools": [
+        "Bash",
+        "PowerShell"
+      ],
+      "command_patterns": [
+        "\\bnpm\\s+(?:i|install|add)(?:\\s+-\\S+)*\\s+[@A-Za-z0-9]",
+        "\\bnpm\\s+(?:update|up|upgrade)\\b",
+        "\\bpnpm\\s+(?:add|update|up|upgrade)\\b",
+        "\\byarn\\s+(?:add|upgrade|up)\\b",
+        "\\bpip3?\\s+install\\b[^|;&]*\\s(?:-U|--upgrade)\\b",
+        "\\buv\\s+(?:add\\b|lock\\s+(?:-U|--upgrade)|pip\\s+install\\b[^|;&]*\\s(?:-U|--upgrade)\\b)",
+        "\\bpoetry\\s+(?:add|update)\\b",
+        "\\bcargo\\s+(?:add|update|upgrade)\\b",
+        "\\b(?:dart|flutter)\\s+pub\\s+(?:add|upgrade)\\b",
+        "\\bgh\\s+pr\\s+(?:checkout|diff|view|review|merge)\\b[^|;&]*\\b(?:dependabot|renovate)/"
+      ],
+      "say": "A dependency version is moving. patch-review diffs the released artifacts (old vs new), runs the deterministic rules over what was added, and checks whether the release's code comes from an author new to the project.\n",
+      "fixtures": {
+        "fire": [
+          "npm install left-pad@1.3.0",
+          "npm i -D typescript@5.6.2",
+          "npm update",
+          "pnpm add zod",
+          "yarn upgrade lodash",
+          "pip install --upgrade requests",
+          "uv lock --upgrade",
+          "uv add httpx",
+          "poetry update",
+          "cargo update -p serde",
+          "flutter pub upgrade",
+          "gh pr checkout dependabot/npm_and_yarn/lodash-4.17.21"
+        ],
+        "quiet": [
+          "npm install",
+          "npm ci",
+          "npm run build",
+          "npm install --no-audit",
+          "pip install -r requirements.txt",
+          "pip install -e .",
+          "cargo build --release",
+          "pnpm install --frozen-lockfile",
+          "gh pr checkout 214",
+          "echo \"npm install left-pad\"",
+          "git commit -m \"bump deps\""
+        ]
+      }
+    }
+  ]
+}

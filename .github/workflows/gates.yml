@@ -1,0 +1,98 @@
+# Leak gates: nothing private and no secrets enter Gnomonkit. Required check on every PR.
+#
+# Runs on GitHub-hosted Linux (the cheapest minute rate) and is built to spend as few minutes as
+# possible: pull requests only (a merge to main re-runs nothing), draft PRs skipped, superseded runs
+# cancelled, one job, a 5-minute ceiling, no setup actions or caches to download.
+#
+# The private denylist comes from the encrypted Actions secret GNOMONKIT_DENYLIST, written to a temp
+# file for the run. leakcheck prints only path:line:category, so logs never contain its contents.
+# Without the secret leakcheck fails closed, except on a pull request from a fork, which never gets
+# secrets: there it runs the file rules and built-in patterns only (--builtin-only), and the change is
+# re-checked with the denylist when it is ported into a release.
+name: gates
+
+on:
+  pull_request:
+    # `edited`: a PR's title and body become public too, so changing them re-runs the gates.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gates-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  GIT_TERMINAL_PROMPT: "0"
+  GITLEAKS_VERSION: "8.21.2"
+  GITLEAKS_SHA256: "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
+
+jobs:
+  gates:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Write the private denylist to a temp file
+        env:
+          DENYLIST: ${{ secrets.GNOMONKIT_DENYLIST }}
+          FROM_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ "$FROM_FORK" = "true" ]; then
+            echo "LEAKCHECK_MODE=--builtin-only" >> "$GITHUB_ENV"
+          else
+            printf '%s\n' "$DENYLIST" > "$RUNNER_TEMP/denylist.txt"
+            echo "GNOMONKIT_DENYLIST=$RUNNER_TEMP/denylist.txt" >> "$GITHUB_ENV"
+          fi
+
+      - name: leakcheck (every tracked file)
+        run: python3 scripts/leakcheck.py $LEAKCHECK_MODE --all
+
+      - name: leakcheck (commit messages in this PR)
+        run: |
+          git log --format='%B' "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            | python3 scripts/leakcheck.py $LEAKCHECK_MODE --stdin commit-messages
+
+      # Title and body are read from the event file. Never interpolate them into the script (PR text is
+      # untrusted) and never pass them through `env:` (the log prints a step's env, which would put the
+      # very text the gate flags into the run log).
+      - name: leakcheck + provenance (PR title and body)
+        run: |
+          python3 -c "import json,os; p=json.load(open(os.environ['GITHUB_EVENT_PATH'],encoding='utf-8'))['pull_request']; open(os.path.join(os.environ['RUNNER_TEMP'],'pr-text.md'),'w',encoding='utf-8').write((p.get('title') or '')+'\n'+(p.get('body') or '')+'\n')"
+          python3 scripts/leakcheck.py $LEAKCHECK_MODE --stdin pr-text < "$RUNNER_TEMP/pr-text.md"
+          python3 scripts/provenance_check.py --stdin pr-text < "$RUNNER_TEMP/pr-text.md"
+
+      # Evidence from one real setup (counts from someone's transcripts, their paths and machine)
+      # names nobody, so the denylist cannot see it. Added lines and commit messages only.
+      - name: provenance (lines added and commit messages in this PR)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/provenance_check.py --diff "$BASE..$HEAD"
+          git log --format='%B' "$BASE..$HEAD" | python3 scripts/provenance_check.py --stdin commit-messages
+
+      - name: gitleaks (full history; pinned, checksum-verified binary)
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --connect-timeout 20 --max-time 120 --retry 2 -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git . --no-banner --redact -l warn
+
+      - name: tests
+        run: |
+          python3 -m pip install --quiet --user --disable-pip-version-check pytest==8.4.2 pyyaml==6.0.3
+          python3 -m pytest -q
+
+      # Validates every Bench scenario and builds its repos. Never calls Claude, so it costs no usage.
+      # A checkout older than the first release that shipped bench/ skips this.
+      - name: bench dry run
+        run: if [ -d bench ]; then python3 -m bench dry-run; else echo "no bench/ here"; fi

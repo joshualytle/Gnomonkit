@@ -1,0 +1,55 @@
+{
+  "description": "Gnomonkit Interjector: records activity, delivers watcher/user notes, predict-then-confirm, names sessions <repo>:<task>. Fails open.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|fork",
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/ij_naming.py\"", "timeout": 5}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "EnterWorktree",
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/ij_worktree_guard.py\"", "timeout": 5}
+        ]
+      },
+      {
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/interject_hook.py\"", "timeout": 15}
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/interject_hook.py\"", "timeout": 15}
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/interject_hook.py\"", "timeout": 15}
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/interject_hook.py\"", "timeout": 15},
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/ij_naming.py\"", "timeout": 5}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/interject_hook.py\"", "timeout": 15}
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+# Gnomonkit denylist: identifiers of yours that must never appear in a public repository.
+#
+# Gnomonkit's leakcheck reads this file (point GNOMONKIT_DENYLIST at it; `gnomonkit overlay link`
+# prints how) and refuses any file, path, commit message or pull request text that matches a rule.
+# It never prints the matched text, only the file, the line and the category.
+#
+# Format: one rule per line. A category, one TAB, then a regular expression, matched without regard
+# to case. Blank lines and lines starting with # are skipped. leakcheck refuses a list with no rules,
+# so add yours before you use it. Examples, with a TAB after the category (delete the "# " to use one):
+#
+# name	\bjane\s+example\b
+# company	\bexample-corp\b
+# host	\bbuild-box-01\b
+# domain	\bexample-internal\.test\b

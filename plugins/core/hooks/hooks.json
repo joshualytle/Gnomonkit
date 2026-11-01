@@ -1,0 +1,91 @@
+{
+  "description": "Gnomonkit core: safety hooks (block), skill routing (suggest only, never blocks), lessons from your history (context only) and a background history index refresh",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/plugin_freshness.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/trust_autodiscover.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/compact_carryover.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/compact_carryover.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|SendMessage|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$OSTYPE\" in msys*|cygwin*) py=python;; *) command -v python3 >/dev/null 2>&1 && py=python3 || py=python;; esac; exec \"$py\" \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

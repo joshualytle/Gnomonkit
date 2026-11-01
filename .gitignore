@@ -1,0 +1,45 @@
+# Local environments and caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+
+# Data never lives in this repo (leakcheck also blocks these if they are force-added)
+*.jsonl
+*.ndjson
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+*.pkl
+*.npy
+*.npz
+*.onnx
+*.gguf
+*.safetensors
+*.dump
+*.bak
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.age
+cases*.json
+data/
+sessions/
+exports/
+.claude/projects/
+.claude/settings.local.json
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini

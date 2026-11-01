@@ -1,0 +1,197 @@
+<title>Report title</title>
+<meta name="description" content="One sentence: what this page answers.">
+<style>
+:root {
+  --bg: #fbfaf7; --fg: #1d1d1b; --muted: #66645e; --line: #e2dfd7; --card: #ffffff;
+  --accent: #0f766e; --accent-fg: #ffffff; --chip: #f1efe9; --warn: #9a3412;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --fg: #ecebe6; --muted: #a3a19a; --line: #2e2d29; --card: #1e1e1b;
+    --accent: #2dd4bf; --accent-fg: #0b1f1d; --chip: #2a2925; --warn: #fdba74;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --fg: #ecebe6; --muted: #a3a19a; --line: #2e2d29; --card: #1e1e1b;
+  --accent: #2dd4bf; --accent-fg: #0b1f1d; --chip: #2a2925; --warn: #fdba74;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main, header { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+header { padding-top: 24px; }
+h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 4px; }
+.meta { color: var(--muted); margin: 0 0 16px; font-size: .9rem; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 0 0 16px; }
+section h2 { font-size: 1.1rem; margin: 0 0 8px; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ask { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.ask .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ask button { font: inherit; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--chip); color: var(--fg); cursor: pointer; }
+.ask button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.ask textarea { width: 100%; margin-top: 8px; min-height: 44px; font: inherit; padding: 8px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); resize: vertical; }
+.ask .saved { color: var(--muted); font-size: .85rem; margin-top: 4px; min-height: 1.2em; }
+/* Answered sections fold to their heading and verdict; "show" reopens them. The open rules repeat the
+   fold selectors with .open added, so they always out-rank them. */
+section.answered > :not(h2):not(.ask) { display: none; }
+section.answered .ask textarea, section.answered .ask .opts { display: none; }
+section.answered.open > :not(h2):not(.ask) { display: revert; }
+section.answered.open .ask textarea { display: block; }
+section.answered.open .ask .opts { display: flex; }
+.fold { display: none; font: inherit; background: none; border: 0; color: var(--accent); padding: 0; cursor: pointer; }
+section.answered .fold { display: inline; }
+#bar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+#bar .status { color: var(--muted); font-size: .9rem; }
+#bar .status.warn { color: var(--warn); }
+#copy { font: inherit; min-height: 40px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+</style>
+
+<header>
+  <h1>Report title</h1>
+  <p class="meta">As of YYYY-MM-DD · what it covers, in one line</p>
+</header>
+<main>
+  <!-- The answer first, then the evidence. One section per thing you want a verdict on.
+       data-ask        = the four default verdicts (Agree / Wrong / Needs work / Question)
+       data-ask="A|B"  = your own options, for a decision
+       no data-ask     = plain content, no feedback controls
+       Every data-ask section needs a stable id: answers are saved under it. -->
+  <section id="answer" data-ask>
+    <h2>The answer</h2>
+    <p>Lead with the number or the conclusion, in a sentence.</p>
+  </section>
+  <section id="choice-1" data-ask="Do it|Not now|Talk first">
+    <h2>A decision</h2>
+    <p>What it is, what it costs, what happens if it waits.</p>
+  </section>
+</main>
+<div id="bar"><span class="status" id="status">Loading…</span><button id="copy" type="button">Copy feedback</button></div>
+
+<script>
+(function () {
+  "use strict";
+  var DEFAULT = ["Agree", "Wrong", "Needs work", "Question"];
+  var KEY = "report-answers:" + location.pathname + ":" + document.title;
+  var state = {};          // id -> {verdict, note}
+  var db = null;           // set when the published page's store is available
+  var writing = {};        // id -> promise, one write at a time per answer
+  var sections = Array.prototype.slice.call(document.querySelectorAll("section[data-ask]"));
+
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
+  function keep() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage blocked */ } }
+  function titleOf(s) { var h = s.querySelector("h2"); return h ? h.textContent.trim() : s.id; }
+
+  function build(s) {
+    var opts = (s.getAttribute("data-ask") || "").split("|").map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!opts.length) opts = DEFAULT;
+    var box = document.createElement("div"); box.className = "ask";
+    var row = document.createElement("div"); row.className = "opts";
+    opts.forEach(function (o) {
+      var b = document.createElement("button"); b.type = "button"; b.textContent = o;
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", function () { choose(s, o); });
+      row.appendChild(b);
+    });
+    var note = document.createElement("textarea"); note.placeholder = "Note (optional)"; note.rows = 2;
+    note.setAttribute("aria-label", "Note on " + titleOf(s));
+    note.addEventListener("change", function () { setNote(s, note.value); });
+    var saved = document.createElement("div"); saved.className = "saved";
+    var fold = document.createElement("button"); fold.type = "button"; fold.className = "fold";
+    fold.addEventListener("click", function () { s.classList.toggle("open"); paint(s); });
+    box.appendChild(row); box.appendChild(note); box.appendChild(saved); box.appendChild(fold);
+    s.appendChild(box);
+  }
+
+  function paint(s) {
+    var a = state[s.id] || {};
+    s.querySelectorAll(".ask .opts button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.textContent === a.verdict));
+    });
+    var note = s.querySelector(".ask textarea");
+    if (document.activeElement !== note) note.value = a.note || "";
+    s.classList.toggle("answered", !!a.verdict);
+    var fold = s.querySelector(".fold");
+    fold.textContent = s.classList.contains("open") ? "Fold" : "Answered: " + (a.verdict || "") + " · show";
+  }
+
+  function status() {
+    var done = sections.filter(function (s) { return state[s.id] && state[s.id].verdict; }).length;
+    var el = document.getElementById("status");
+    el.textContent = done + " of " + sections.length + " answered · " +
+      (db ? "saved where Claude can read it" : "not reaching Claude here: use Copy feedback, or answer on the published page");
+    el.className = "status" + (db ? "" : " warn");
+  }
+
+  function save(s) {
+    var id = s.id, a = state[id] || {};
+    keep(); paint(s); status();
+    if (!db) return;
+    var mark = s.querySelector(".saved");
+    var body = { section: id, title: titleOf(s), verdict: a.verdict || "", note: a.note || "",
+                 at: new Date().toISOString() };
+    var prev = writing[id] || Promise.resolve();
+    writing[id] = prev.then(function () { return db.collection("answers").doc(id).set(body); })
+      .then(function () { mark.textContent = "Saved"; })
+      .catch(function (e) { mark.textContent = "Not saved (" + ((e && e.code) || "error") + "). Use Copy feedback."; });
+  }
+
+  function choose(s, verdict) {
+    var a = state[s.id] || {};
+    state[s.id] = { verdict: a.verdict === verdict ? "" : verdict, note: a.note || "" };
+    if (state[s.id].verdict) s.classList.remove("open");
+    save(s);
+  }
+  function setNote(s, text) {
+    var a = state[s.id] || {};
+    if ((a.note || "") === text) return;
+    state[s.id] = { verdict: a.verdict || "", note: text };
+    save(s);
+  }
+
+  function copyText() {
+    var lines = ["FEEDBACK: " + document.title];
+    sections.forEach(function (s) {
+      var a = state[s.id];
+      if (a && (a.verdict || a.note)) {
+        lines.push("- " + s.id + " [" + (a.verdict || "no verdict") + "]" + (a.note ? " " + a.note.replace(/\s+/g, " ") : ""));
+      }
+    });
+    if (lines.length === 1) lines.push("(nothing answered yet)");
+    return lines.join("\n");
+  }
+  document.getElementById("copy").addEventListener("click", function () {
+    var text = copyText(), btn = this;
+    function done(ok) { btn.textContent = ok ? "Copied" : "Copy failed: select the text"; setTimeout(function () { btn.textContent = "Copy feedback"; }, 2000); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { window.prompt("Copy this:", text); done(false); });
+    } else { window.prompt("Copy this:", text); done(false); }
+  });
+
+  state = load();
+  sections.forEach(function (s) { build(s); paint(s); });
+  status();
+
+  // The published page saves answers to its own store, where Claude reads them back. Anywhere else
+  // (a saved file, a preview) there is no store: the page still works and Copy feedback carries them.
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("db").then(function (d) {
+      if (!d) return;
+      db = d; status();
+      db.collection("answers").onSnapshot(function (snap) {
+        snap.docs.forEach(function (doc) {
+          var v = doc.data() || {};
+          if (doc.id in state && state[doc.id].verdict === v.verdict && state[doc.id].note === v.note) return;
+          state[doc.id] = { verdict: v.verdict || "", note: v.note || "" };
+        });
+        keep();
+        sections.forEach(paint); status();
+      }, function () { db = null; status(); });
+    }, function () { /* no store: copy-out only */ });
+  }
+})();
+</script>

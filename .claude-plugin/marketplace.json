@@ -1,0 +1,31 @@
+{
+  "name": "gnomonkit",
+  "owner": {
+    "name": "Gnomonkit contributors"
+  },
+  "metadata": {
+    "description": "Working discipline and memory for AI coding agents. Pair it with your own private overlay for rules that are yours alone."
+  },
+  "plugins": [
+    {
+      "name": "core",
+      "source": "./plugins/core",
+      "description": "Safety hooks and working-discipline skills for AI coding agents, with a local search of your past sessions and lessons from them."
+    },
+    {
+      "name": "interjector",
+      "source": "./plugins/interjector",
+      "description": "Opt-in: step into a running session (comment, block, hold), a watcher that does it for you, predict-then-confirm before questions, and session names plus a status board."
+    },
+    {
+      "name": "supply-chain",
+      "source": "./plugins/supply-chain",
+      "description": "Review what a dependency update actually ships: the registry artifacts diffed old vs new, deterministic rules, and a new-committer check."
+    },
+    {
+      "name": "portal",
+      "source": "./plugins/portal",
+      "description": "Optional: a read-only web dashboard over core's effectiveness collector (effectiveness, readiness, usage, open work items, memory search), on your desktop or a server, with an install script, or as one static HTML snapshot."
+    }
+  ]
+}

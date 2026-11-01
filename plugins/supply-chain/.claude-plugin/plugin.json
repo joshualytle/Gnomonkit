@@ -1,0 +1,30 @@
+{
+  "name": "supply-chain",
+  "description": "Gnomonkit supply-chain: review what a dependency update actually changes. Downloads the released artifacts (npm tarball, PyPI sdist or wheel, crate, pub archive) for the old and new version, verifies their digests, reads them in memory without running anything, diffs them file by file and runs deterministic rules over what was added. A new-committer check says which changes come from an author new to the project and what they touched. Two entry points over one engine: patch review (a bump in this repo's lockfile or manifest) and release review (a package and version range). Standard library only; an optional local-model summary is off by default.",
+  "version": "1.0.2",
+  "userConfig": {
+    "ollama_url": {
+      "type": "string",
+      "title": "Local model URL",
+      "description": "Optional. A loopback Ollama URL (e.g. http://127.0.0.1:11434) for a short, unverified summary of each release diff. Off when empty; flags never depend on it.",
+      "required": false
+    },
+    "ollama_model": {
+      "type": "string",
+      "title": "Local model name",
+      "description": "Optional. The Ollama model that writes the summary. Needed only with the local model URL.",
+      "required": false
+    },
+    "cache_dir": {
+      "type": "string",
+      "title": "Artifact cache",
+      "description": "Optional. Where downloaded archives are cached by digest (never extracted). Defaults to ~/.cache/gnomonkit-supply-chain.",
+      "required": false
+    }
+  },
+  "author": {
+    "name": "Gnomonkit contributors"
+  },
+  "homepage": "https://github.com/joshualytle/Gnomonkit",
+  "license": "MIT"
+}

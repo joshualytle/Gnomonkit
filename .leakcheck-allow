@@ -1,0 +1,10 @@
+# Text removed before leakcheck's denylist and built-in patterns run. Each line is a regex.
+# Every entry needs a comment saying why it is safe to publish.
+
+# The project's own public home: the maintainer's GitHub handle as part of this repo's address.
+# Exactly that name: the lookahead keeps a longer repository name (any private sibling) checked.
+(https://)?(github\.com/)?joshualytle/gnomonkit(?![\w.-]*\w)
+
+# The maintainer's GitHub noreply address: the author of every public release commit and the
+# principal in release/allowed_signers, so it is published with each release anyway.
+287242675.joshualytle@users.noreply.github.com

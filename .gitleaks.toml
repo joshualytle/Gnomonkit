@@ -1,0 +1,6 @@
+# gitleaks configuration: the built-in ruleset, plus narrow allowlists.
+# Add an allowlist entry only with a comment explaining why the match is a false positive.
+title = "gnomonkit gitleaks config"
+
+[extend]
+useDefault = true

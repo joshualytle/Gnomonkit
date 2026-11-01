@@ -1,0 +1,13 @@
+# The release key the sync gate suggests for the Gnomonkit marketplace (docs/SYNC.md, docs/RELEASING.md).
+#
+# Format: ssh-keygen's ALLOWED SIGNERS, one key per line:
+#     <principal> namespaces="git" <key type> <base64 public key>
+#
+# This file is a suggestion, never a trust root. With an overlay, `gnomonkit sync adopt gnomonkit`
+# drafts a pull request that copies these keys into the overlay's sync/signers/gnomonkit.allowed_signers,
+# and only a merged pull request makes the gate trust them. Without an overlay, the freshness notice
+# offers an update to the Gnomonkit marketplace only when its commits are signed by a key listed here.
+#
+# It holds no key until the maintainer adds the release key (the same line as release/allowed_signers).
+# Until then nothing verifies against it, so without an overlay no update to an adopted Gnomonkit
+# marketplace is offered.
