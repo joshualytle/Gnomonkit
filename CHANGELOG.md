@@ -3,6 +3,37 @@
 Each entry names the plugins it changes. Versions follow semantic versioning per plugin; the
 version guard in the test suite requires a bump whenever a plugin's hooks or skills change.
 
+## interjector 1.6.9
+
+- **Comment only.** `open_uri`'s docstring gives the reason for `code --open-url` by its mechanism.
+
+## interjector 1.6.8
+
+- **The extension's link is sent with `code --open-url`.** The system's protocol handler, launched from a
+  session's shell, can fail to reach the running VS Code window and says nothing, so a dispatched tab
+  never opened while the report said it had. Wherever the `code` command is found the link now goes
+  through it; the system handler is the fallback, and `GNOMONKIT_URI_OPENER` still overrides both.
+
+## interjector 1.6.7
+
+- **A dispatched VS Code tab is called open only once its process exists.** VS Code hands an
+  extension a link only after the user has allowed that extension once (a dialog it drops unanswered
+  after five minutes, or the setting `extensions.confirmedUriHandlerExtensionIds`), which nobody sees
+  from a phone. Dispatch now reads that before sending the link, waits `tab_seconds` (default 20)
+  for the tab's own process afterwards, and when the tab did not open says so and names what to
+  allow, instead of reporting a tab that is open nowhere.
+
+## core 1.7.5, interjector 1.6.6
+
+- **Remote work gets a primary the phone always sees.** `gnomonkit setup remote on` now also sets
+  `dispatch.primary_client = "terminal"` (pass `--client` for another choice) and says why: a VS Code
+  tab is on the phone only while VS Code has it open and running, while a background primary with
+  Remote Control always is, joined at the desk from its claude.ai/code link or `claude attach`, never
+  the VS Code session list (a second process on the conversation exits and loses the message).
+  `setup status` and `setup remote status` show the client and warn when `working.remote` is yes
+  with a `vscode` client; the onboarding skill, PROFILES.md and ONBOARDING.md carry the trade-off
+  table; and dispatch's start report says it when a tab opens for someone who works remotely.
+
 ## core 1.7.4
 
 - **Setup asks about remote and phone work.** A new default-set question, `working.remote`. On yes,

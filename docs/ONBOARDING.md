@@ -147,7 +147,11 @@ in your user settings (the old file is kept as `settings.json.bak`), so every se
 every background session Gnomonkit starts for you, is on your phone and at claude.ai/code while it
 runs. The command then prints, for each project you dispatch sessions from, the two things that stay
 yours: the grant that lets that project's sessions start, hand off to and stop their own, and the
-folder trust. `gnomonkit setup remote off` turns the setting back off; `setup status` shows it.
+folder trust. It also sets `dispatch.primary_client = "terminal"` (unless you pass `--client`), so a
+primary Gnomonkit hands off is a background process the phone always sees, joined at the desk from its
+claude.ai/code link or `claude attach`; a VS Code tab is on the phone only while VS Code has it open
+(the trade-off table is in [PROFILES.md](PROFILES.md)). `gnomonkit setup remote off` turns the setting
+back off; `setup status` shows both, and warns when you work remotely with a `vscode` client.
 
 **Settings that grant permissions are yours to set.** Which background sessions Claude may start for
 you, and which folders count as trusted, are permissions, so Claude doesn't choose them and setup

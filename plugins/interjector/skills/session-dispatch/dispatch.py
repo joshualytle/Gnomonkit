@@ -88,8 +88,11 @@ open it from a session list in any client. A VS Code tab cannot take over a runn
 "terminal": started with --bg and left running. "vscode": a VS Code tab that is usable from the tab AND
 the phone with nothing to press: the first turn runs as a one-shot (`claude -p --session-id <uuid>`, no
 background job), then `code <project>` opens or focuses that folder's window and the extension's link
-(vscode://anthropic.claude-code/open?session=<uuid>) opens the session there, so VS Code's own process
-carries it from then on, with Remote Control as the user's remoteControlAtStartup says. It is the default
+(vscode://anthropic.claude-code/open?session=<uuid>, sent with `code --open-url`) opens the session there, so VS Code's own process
+carries it from then on, with Remote Control as the user's remoteControlAtStartup says. VS Code hands an
+extension's link on only once the user has allowed that extension (a dialog it drops unanswered after
+five minutes, or the setting extensions.confirmedUriHandlerExtensionIds); dispatch reads that first and,
+after the link, waits for the tab's own process (`claude agents`) before it calls the tab open. It is the default
 for "any" wherever the `code` command is found: the CLI refuses to resume a session that was ever a
 background job ("That session is running in the background"), so a tab can never take one over, and a
 message typed into such a tab is lost. No background slot and no watcher. A background session is started
@@ -127,6 +130,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -161,6 +165,11 @@ VSCODE_URI = "vscode://anthropic.claude-code/open"
 VSCODE_SETTLE_S = 2.0  # after `code <folder>`, before the link: the link goes to the window with focus
 CODE_TIMEOUT_S = 30
 FIRST_TURN_TIMEOUT_S = 900   # the one-shot first turn of a tab primary (GNOMONKIT_DISPATCH_FIRST_TURN_SECONDS)
+VSCODE_EXT_ID = "anthropic.claude-code"
+LINK_SETTING = "extensions.confirmedUriHandlerExtensionIds"
+LINK_FIX = ("VS Code asks once before an extension may receive links: in its dialog \"Allow 'Claude Code' "
+            "extension to open this URI?\" tick Don't ask again and press Open (it waits five minutes), or, with "
+            "no dialog, open Settings, search %s and add %s" % (LINK_SETTING, VSCODE_EXT_ID))
 BACKGROUND_REFUSAL = "running in the background"
 VSCODE_GUARD = """
 ## Where this session runs
@@ -596,11 +605,18 @@ def vscode_uri(prompt: str | None, session: str | None = None) -> str:
 
 
 def open_uri(uri: str) -> str | None:
-    """Hand a link to the system (Start-Process on Windows, open, xdg-open); GNOMONKIT_URI_OPENER (a JSON
-    list) overrides that. An error string, or None."""
+    """Hand the extension's link to VS Code: `code --open-url` wherever the `code` command is found, since the
+    system's protocol handler, launched from a session's shell, can fail to reach the running window and
+    says nothing, while `code --open-url` talks to the running window directly. Without
+    `code`, the system opens it (Start-Process on Windows, open, xdg-open). GNOMONKIT_URI_OPENER (a JSON list)
+    overrides both. An error string, or None."""
     cmd = _cmd_from_env("GNOMONKIT_URI_OPENER", "")
     if cmd is None and os.environ.get("GNOMONKIT_URI_OPENER"):
         return "GNOMONKIT_URI_OPENER is not a JSON list"
+    if cmd is None:
+        code = _cmd_from_env("GNOMONKIT_CODE_CMD", "code")
+        if code:
+            cmd = [*code, "--open-url"]
     if cmd is None and os.name == "nt":
         try:
             os.startfile(uri)  # noqa: S606 - a fixed scheme, built here
@@ -615,6 +631,79 @@ def open_uri(uri: str) -> str | None:
     except (OSError, subprocess.SubprocessError) as e:
         return e.__class__.__name__
     return None if r.returncode == 0 else f"{cmd[0]} exited {r.returncode}"
+
+
+def vscode_user_dir() -> Path | None:
+    """VS Code's user folder (settings.json, globalStorage); GNOMONKIT_VSCODE_USER_DIR overrides it."""
+    raw = os.environ.get("GNOMONKIT_VSCODE_USER_DIR")
+    if raw:
+        return Path(raw)
+    if os.name == "nt":
+        base = os.environ.get("APPDATA")
+        return Path(base) / "Code" / "User" if base else None
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Code" / "User"
+    return Path.home() / ".config" / "Code" / "User"
+
+
+def link_allowed() -> bool | None:
+    """Whether VS Code hands the extension's link on without asking. The first time an extension receives a
+    link VS Code shows "Allow '<extension>' to open this URI?" and drops the link unanswered after five
+    minutes, which nobody sees from a phone. True when the extension is in the user setting
+    extensions.confirmedUriHandlerExtensionIds or in the list the dialog's "Don't ask again" fills
+    (extensionUrlHandler.confirmedExtensions in VS Code's state database, read without locking it); False
+    when both were read and it is in neither; None when VS Code's user folder was not found."""
+    d = vscode_user_dir()
+    if d is None or not d.is_dir():
+        return None
+    seen = False
+    try:
+        text = (d / "settings.json").read_text(encoding="utf-8")
+    except OSError:
+        text = None
+    if text is not None:
+        seen = True
+        m = re.search(r'"%s"\s*:\s*\[([^\]]*)\]' % re.escape(LINK_SETTING), text)
+        if m and VSCODE_EXT_ID in m.group(1).lower():
+            return True
+    db = d / "globalStorage" / "state.vscdb"
+    if db.is_file():
+        try:
+            con = sqlite3.connect(db.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
+            try:
+                row = con.execute("select value from ItemTable where key = 'extensionUrlHandler.confirmedExtensions'"
+                                  ).fetchone()
+            finally:
+                con.close()
+            seen = True
+            allowed = json.loads(row[0]) if row and row[0] else []
+            if isinstance(allowed, list) and VSCODE_EXT_ID in [str(x).lower() for x in allowed]:
+                return True
+        except (sqlite3.Error, OSError, ValueError, TypeError):
+            pass
+    return False if seen else None
+
+
+def tab_wait_s() -> float:
+    """How long the tab's own process is waited for after the link (setting tab_seconds; 0 = not at all)."""
+    try:
+        return float(R.setting("tab_seconds"))
+    except (TypeError, ValueError):
+        return float(R.DEFAULTS["tab_seconds"])
+
+
+def tab_process(session: str, limit: float) -> bool:
+    """Whether a session process carrying `session` appeared within `limit` seconds of the link: VS Code's own,
+    listed by `claude agents` as interactive. Dispatch starts nothing here."""
+    deadline = time.monotonic() + max(0.0, limit)
+    while True:
+        entries, _ = B.fetch_agents()
+        if any(e.get("sessionId") == session and e.get("kind") != "background" for e in entries):
+            return True
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return False
+        time.sleep(min(2.0, left))
 
 
 def focus_folder(project: Path) -> tuple[bool, str | None]:
@@ -714,7 +803,7 @@ def open_in_vscode(project: Path, name: str | None, brief_text: str, kind: str, 
         shown = resume or "<session-id>"
         plan.update(brief=str(brief), brief_text=brief_text, sessionId=shown,
                     command=first_turn_command(base, shown, brief, name, mode, model, effort, bool(resume)),
-                    uri=vscode_uri(None, shown))
+                    uri=vscode_uri(None, shown), link_allowed=link_allowed())
         return plan
     brief = write_brief(brief_text, name, kind)
     plan.update(brief=str(brief), sessionId=session)
@@ -729,10 +818,14 @@ def open_in_vscode(project: Path, name: str | None, brief_text: str, kind: str, 
     plan.update(uri=uri, focused=focused)
     if why:
         plan["focus_error"] = why
+    plan["link_allowed"] = link_allowed()
     err = open_uri(uri)
     if err:
         plan["error"] = (f"the first turn ran, but the VS Code link could not be opened ({err}); open the session "
                          f"from the {project.name} session list, or with `claude --resume {session}`")
+        return plan
+    wait = tab_wait_s()
+    plan.update(waited=wait, carried=tab_process(session, wait))
     return plan
 
 
@@ -1161,16 +1254,39 @@ def _record(key: str, **fields) -> bool:
 def _vscode_next(plan: dict, dry: bool) -> str:
     folder = Path(plan["project"]).name
     tab = f"{plan['resumed']} in a VS Code tab" if plan.get("resumed") else "a VS Code tab"
+    gate = plan.get("link_allowed") is False
     if dry:
-        return (f"would run its first turn as a one-shot (`claude -p`, no background job), then "
+        text = (f"would run its first turn as a one-shot (`claude -p`, no background job), then "
                 f"{'reopen' if plan.get('resumed') else 'open'} {tab} in the {folder} window (`code <folder>`, then "
                 "the extension's link with the session id); nothing to press")
+        if gate:
+            text += (f"; but VS Code has not yet been allowed to hand {VSCODE_EXT_ID} a link, so the tab would wait "
+                     f"for a click: {LINK_FIX}")
+        return text
     where = (f"in the {folder} window" if plan.get("focused") else
              f"in whichever VS Code window has focus ({plan.get('focus_error') or 'the folder was not focused'}; "
              f"if that is not the {folder} window, close the tab and open it from the {folder} session list)")
-    return (f"its first turn ran; {'reopened' if plan.get('resumed') else 'opened'} {tab} {where}. Nothing to press: "
-            "the tab's own process carries it, so it is on the phone too when Remote Control is on for all "
-            "sessions (the extension's setting, or remoteControlAtStartup)")
+    if plan.get("carried"):
+        return (f"its first turn ran; {'reopened' if plan.get('resumed') else 'opened'} {tab} {where}. Nothing to "
+                "press: the tab's own process carries it, so it is on the phone too when Remote Control is on for "
+                "all sessions (the extension's setting, or remoteControlAtStartup)" + tab_tradeoff())
+    sent = "its first turn ran and the link was sent"
+    if gate:
+        return (f"{sent}, but VS Code is waiting for a click before it opens {tab} {where}: {LINK_FIX}. Until then "
+                f"the session is open nowhere and the phone does not list it; it waits in the {folder} session list")
+    return (f"{sent}, but no VS Code process picked up the session within {plan.get('waited', 0):g} s, so {tab} is "
+            f"not open: open the session from the {folder} session list (a tab that appears later carries it from "
+            "then on)")
+
+
+def tab_tradeoff() -> str:
+    """For someone who works remotely (the profile's working.remote = yes): a tab is on the phone only while
+    VS Code has it open, while a background primary always is. Empty otherwise."""
+    if N.profile_table("working").get("remote") != "yes":
+        return ""
+    return (". You work remotely: the phone sees this tab only while VS Code has it open and running; a primary "
+            "that is always on the phone is primary_client = terminal (`gnomonkit setup remote on` sets it), "
+            "opened at the desk from its claude.ai/code link or `claude attach`, not the VS Code list")
 
 
 def running_routes(sid: str) -> str:

@@ -177,11 +177,24 @@ The default set is what first-run setup asks, in one message; advanced is offere
 
 The interjector's session-dispatch also reads a `[dispatch]` table from this file: `auto_stop`
 (true, false; default true), `stop_timeout_minutes` (a number above 0, at most 1440; default 15) and
-`primary_client` (`"any"`, `"terminal"`, `"vscode"`; default `"any"`), and `primary_model`,
+`primary_client` (`"any"`, `"terminal"`, `"vscode"`; default `"any"`), `tab_seconds` (how long a VS Code
+tab primary's own process is waited for after the link, 0 to 300; default 20), and `primary_model`,
 `primary_effort`, `sub_model`, `sub_effort` (defaults `""`, `"medium"`, `"sonnet"`, `"medium"`). See
 [session roles](../plugins/interjector/README.md#roles-one-primary-per-project-subs-that-stop-when-finished).
-`profile set` doesn't manage it; add the table by hand (`profile set` keeps tables it doesn't know).
-A `GNOMONKIT_DISPATCH_*` variable of the same name wins over the file.
+`profile set` manages `dispatch.primary_client`; add the rest of the table by hand (`profile set` keeps
+keys it doesn't know). A `GNOMONKIT_DISPATCH_*` variable of the same name wins over the file.
+
+Which `primary_client` to pick depends on where you are when you reply:
+
+| `primary_client` | On the desk | On the phone |
+|---|---|---|
+| `terminal` | its claude.ai/code link, or `claude attach <id>` in a terminal; not the VS Code session list (a second process on the conversation exits at once and loses your message) | always, while it runs |
+| `vscode` | the VS Code tab | only while VS Code has the tab open and running |
+| `any` | a tab where the `code` command is found, else as `terminal` | as the one it resolved to |
+
+`gnomonkit setup remote on` sets `terminal` (pass `--client` for another), since remote work needs a
+process that outlives the desk; `setup remote status` warns when `working.remote` is yes and the
+client is `vscode`.
 
 Session titles follow a `[naming]` table in the same way: `primary` (default `"{repo}:{task}"`), `sub`
 (default `"sub:{parent}/{task}"`) and `prefix` (none by default). The fields, the rules a scheme must

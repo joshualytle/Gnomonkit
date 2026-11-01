@@ -536,8 +536,10 @@ SCHEMA = (
     Setting("communication.explanation_level", "choice", "Explanations", "standard", ("brief", "standard", "teach"),
             group="advanced"),
     Setting("working.subagents", "choice", "Subagents", "normal", ("sparing", "normal", "liberal"), group="advanced"),
-    Setting("dispatch.primary_client", "choice", "How a primary session dispatch starts opens (any: background, "
-            "kept running with Remote Control; terminal: background, always running; vscode: a VS Code tab)",
+    Setting("dispatch.primary_client", "choice", "How a primary session dispatch starts opens (terminal: a "
+            "background process, always on the phone, joined at the desk by its claude.ai/code link or claude attach; "
+            "vscode: a VS Code tab, on the phone only while it is open; any: a tab where the code command is found, "
+            "else terminal)",
             "any", ("any", "terminal", "vscode"), group="advanced"),
     Setting("orchestrator.model", "text", "Orchestrator model (empty: haiku for claude and api; required for ollama)",
             None, group="advanced", max_len=80),

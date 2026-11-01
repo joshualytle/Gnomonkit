@@ -110,7 +110,10 @@ value, it prints the valid choices: ask again about that one only.
 "Do you work remotely or from the phone a lot?". On yes, leave it out of the
 `profile set` call and run `setup remote on` instead: it turns Claude Code's
 `remoteControlAtStartup` on in the user-level settings (the old file is kept
-as `.bak`), records `working.remote=yes` in the profile, and prints what is
+as `.bak`), records `working.remote=yes` in the profile, sets
+`dispatch.primary_client=terminal` (a background primary is always on the
+phone; a VS Code tab only while it is open; `--client vscode` if they want the
+tab anyway, and say the trade-off the command prints), and prints what is
 still theirs to do. Pass `--project DIR` once per project they dispatch
 sessions from (ask which), and show them the printed checklist as it is: one
 block per project with the exact `grants add` and trust commands. **Never run

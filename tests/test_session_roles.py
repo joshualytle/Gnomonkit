@@ -66,6 +66,12 @@ elif args[:1] == ["-p"]:
                          " to open it, or `claude stop %s` first to resume it here.\n" % ((refuse,) * 3))
         sys.exit(1)
     sys.stdout.write("first turn done\n")
+    if read("p_tab.json", False):                # VS Code picked the session up: its own process is listed
+        sid = args[args.index("--session-id") + 1] if "--session-id" in args else args[args.index("--resume") + 1]
+        name = args[args.index("--name") + 1] if "--name" in args else None
+        write("agents.json", read("agents.json", []) + [
+            {"pid": 777, "cwd": os.getcwd(), "kind": "interactive", "startedAt": 2000, "sessionId": sid,
+             "name": name, "status": "idle"}])
 else:
     sys.exit(3)
 '''
@@ -733,13 +739,22 @@ with open(os.path.join(os.environ["FAKE_CLAUDE_STATE"], "ext_calls.jsonl"), "a",
 '''
 
 
-def vscode(env, client="vscode"):
-    """The environment for a fake `code` and link opener, which record their arguments."""
+def vscode(env, client="vscode", tab=True, allowed=True):
+    """The environment for a fake `code` and link opener, which record their arguments; a VS Code user folder
+    whose settings allow the extension's links (or, `allowed=False`, do not); and whether the tab's own process
+    appears once the first turn ran (`tab`)."""
     fake = env["state"] / "fake_ext.py"
     fake.write_text(FAKE_EXT, encoding="utf-8")
+    env["put"]("p_tab.json", bool(tab))
+    user = env["state"] / "vscode-user"
+    user.mkdir(exist_ok=True)
+    (user / "settings.json").write_text(json.dumps(
+        {"extensions.confirmedUriHandlerExtensionIds": ["anthropic.claude-code"]} if allowed else {"editor.fontSize": 14}),
+        encoding="utf-8")
     return {"GNOMONKIT_CODE_CMD": json.dumps([sys.executable, str(fake), "code"]),
             "GNOMONKIT_URI_OPENER": json.dumps([sys.executable, str(fake), "open"]),
-            "GNOMONKIT_DISPATCH_VSCODE_SETTLE_SECONDS": "0", "GNOMONKIT_DISPATCH_PRIMARY_CLIENT": client}
+            "GNOMONKIT_DISPATCH_VSCODE_SETTLE_SECONDS": "0", "GNOMONKIT_DISPATCH_PRIMARY_CLIENT": client,
+            "GNOMONKIT_DISPATCH_TAB_SECONDS": "0", "GNOMONKIT_VSCODE_USER_DIR": str(user)}
 
 
 def ext_calls(env):
@@ -1327,3 +1342,76 @@ def test_name_and_pull_request_helpers(tmp_path, monkeypatch):
     assert R.normalise_pr(url) == url and R.normalise_pr(url + "/files") is None
     assert R.is_prompt(user("fix it")) and not R.is_prompt(user("<command-name>/clear</command-name>"))
     assert not R.is_prompt({"type": "user", "message": {"content": [{"type": "tool_result", "content": "x"}]}})
+
+
+def test_a_tab_for_someone_who_works_remotely_says_the_phone_sees_it_only_while_open(env):
+    args = ("spawn", "demo-repo", "--role", "primary", "--task", "release", "--prompt", "Ship it.")
+    rc, out, err = env["run"](*args, **vscode(env))
+    assert rc == 0, err
+    assert "Nothing to press" in out and "You work remotely" not in out
+    profile = Path(env["home"]) / "personal.toml"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text('[working]\nremote = "yes"\n', encoding="utf-8")
+    env["agents"]([])
+    rc, out, err = env["run"]("spawn", "other-repo", "--role", "primary", "--task", "release", "--prompt", "Go.",
+                              **vscode(env))
+    assert rc == 0, err
+    assert ("You work remotely: the phone sees this tab only while VS Code has it open" in out
+            and "setup remote on" in out and "claude attach" in out)
+
+
+
+def test_a_tab_whose_process_never_appears_is_not_called_open(env):
+    rc, out, err = env["run"]("spawn", "demo-repo", "--role", "primary", "--task", "release", **vscode(env, tab=False))
+    assert rc == 0, err
+    assert "no VS Code process picked up the session within 0 s" in out and "demo-repo session list" in out
+    assert "Nothing to press" not in out
+    [(turn, _cwd)] = one_shots(env)
+    assert env["roles"]()[turn[2]]["client"] == "vscode"            # the session exists; a later tab carries it
+
+
+def test_a_link_vs_code_has_not_allowed_yet_is_reported_with_the_fix(env):
+    v = vscode(env, tab=False, allowed=False)
+    rc, out, err = env["run"]("spawn", "demo-repo", "--role", "primary", "--task", "release", "--dry-run", **v)
+    assert rc == 0, err
+    assert "VS Code has not yet been allowed" in out and "confirmedUriHandlerExtensionIds" in out
+    rc, out, err = env["run"]("spawn", "demo-repo", "--role", "primary", "--task", "release", **v)
+    assert rc == 0, err
+    assert "VS Code is waiting for a click" in out
+    assert "Allow 'Claude Code' extension to open this URI?" in out and "Don't ask again" in out
+    assert "the phone does not list it" in out and "demo-repo session list" in out
+    assert len(ext_calls(env)) == 2                                   # the link was still sent: a click opens it
+
+
+def test_an_extension_allowed_from_the_dialog_counts_as_allowed(env):
+    import sqlite3
+    v = vscode(env, allowed=False)
+    db = Path(v["GNOMONKIT_VSCODE_USER_DIR"]) / "globalStorage" / "state.vscdb"
+    db.parent.mkdir()
+    con = sqlite3.connect(str(db))
+    con.execute("create table ItemTable (key text primary key, value blob)")
+    con.execute("insert into ItemTable values (?, ?)", ("extensionUrlHandler.confirmedExtensions",
+                                                        json.dumps(["other.extension", "Anthropic.claude-code"])))
+    con.commit()
+    con.close()
+    rc, out, err = env["run"]("spawn", "demo-repo", "--role", "primary", "--task", "release", **v)
+    assert rc == 0, err
+    assert "waiting for a click" not in out and "Nothing to press" in out
+
+
+def test_without_a_vs_code_user_folder_the_link_check_is_unknown(env):
+    v = dict(vscode(env, tab=False), GNOMONKIT_VSCODE_USER_DIR=str(env["tmp"] / "missing"))
+    rc, out, err = env["run"]("spawn", "demo-repo", "--role", "primary", "--task", "release", **v)
+    assert rc == 0, err
+    assert "waiting for a click" not in out and "no VS Code process picked up the session" in out
+
+
+def test_the_link_goes_through_the_code_command_where_it_is_found(env):
+    v = vscode(env)
+    del v["GNOMONKIT_URI_OPENER"]                                    # no override: the real choice
+    rc, out, err = env["run"]("spawn", "demo-repo", "--role", "primary", "--task", "release", **v)
+    assert rc == 0, err
+    [code, opened] = ext_calls(env)
+    assert code[0] == "code" and opened[:2] == ["code", "--open-url"]
+    assert link_query(opened[2]) == {"session": one_shots(env)[0][0][2]}
+    assert "Nothing to press" in out

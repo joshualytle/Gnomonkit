@@ -55,13 +55,13 @@ history before asking you something it may already know.
 ## Does it make a difference?
 
 [Gnomonkit Bench](bench/README.md) runs synthetic scenarios with and without Gnomonkit installed
-and scores what each run did, never what it said. One round on Sonnet in October 2026, every
+and scores what each run did, never what it said. One round on Sonnet in November 2026, every
 scenario three times:
 
 | family (runs per arm) | without Gnomonkit | with Gnomonkit |
 |---|---|---|
-| interjection (18) | 0/18 | 14/18 |
-| skills (30) | 12/30 | 17/30 |
+| interjection (18) | 0/18 | 12/18 |
+| skills (30) | 12/30 | 18/30 |
 | guards (9) | 9/9 | 9/9 |
 
 What each row tests, and how Gnomonkit changes it:

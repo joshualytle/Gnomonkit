@@ -287,16 +287,22 @@ Two separate permissions, both yours to give (see
   how to attach. With `primary_client = "terminal"` no watcher runs. A background session gets
   Remote Control like any other when `remoteControlAtStartup` is on;
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` turns Remote Control off for every session.
-- **A primary in a VS Code tab, when you ask for one.** With `--client vscode` (or
-  `primary_client = "vscode"`), `code <project>` opens or focuses that folder's window, then the
-  extension's link (`vscode://anthropic.claude-code/open?prompt=...`) opens a new Claude Code tab
-  there with the pointer to the brief typed in. VS Code never sends that prompt, so you press Enter
-  in the tab, which is why this is never the default. The link opens in whichever window has focus;
-  without the `code` command the tab may land elsewhere, so the brief tells the session to stop if
-  its folder is not the project. A stopped session that holds the title is reopened the same way
-  (`&session=<id>`). The tab takes no background slot, gets Remote Control as your
-  `remoteControlAtStartup` says, and is titled from its brief by the naming hook, since a tab can't
-  be given `--name`. It may ask once to read the brief, which is outside the project.
+- **A primary in a VS Code tab, usable from the tab and the phone with nothing to press.** Wherever
+  the `code` command is found (`primary_client = "any"`, the default, or `"vscode"`), dispatch runs
+  the primary's first turn as a one-shot (`claude -p` under a fresh session id, no background job),
+  then `code <project>` opens or focuses that folder's window and the extension's link
+  (`vscode://anthropic.claude-code/open?session=<id>`) opens the session there. VS Code's own
+  process carries it from then on, with Remote Control as your `remoteControlAtStartup` says, so
+  the phone lists it while VS Code has the tab open. VS Code hands an extension a link only once
+  you have allowed it (its dialog "Allow 'Claude Code' extension to open this URI?", dropped
+  unanswered after five minutes, or the setting `extensions.confirmedUriHandlerExtensionIds`):
+  dispatch reads that before sending the link, waits `tab_seconds` for the tab's own process
+  afterwards, and when the tab did not open says so and names what to allow. The link opens in
+  whichever window has focus; without the `code` command the tab may land elsewhere, so the brief
+  tells the session to stop if its folder is not the project. A stopped session that holds the
+  title is reopened the same way. The tab takes no background slot and is titled
+  from its brief; the CLI refuses to resume a session that was ever a background job, so no tab
+  can take one over.
 - **Subs stop themselves.** A sub's brief ends by telling it to run `dispatch.py done` once it has
   reported, and `dispatch.py pr <n>` once it opens a pull request (a number is kept as the pull
   request's URL, read with gh in the sub's own folder, so the merge check reads that repository's).
@@ -328,7 +334,8 @@ Records live in `~/.gnomonkit/dispatch/roles.json`; a copy that can't be parsed 
 |---|---|---|---|
 | `[dispatch] auto_stop` | `GNOMONKIT_DISPATCH_AUTO_STOP` | `true` | stop finished subs on their own (`stop-finished` still works when off) |
 | `[dispatch] stop_timeout_minutes` | `GNOMONKIT_DISPATCH_STOP_TIMEOUT_MINUTES` | `15` | how long the watcher waits for a primary's turn to end (at most 1440, a day) |
-| `[dispatch] primary_client` | `GNOMONKIT_DISPATCH_PRIMARY_CLIENT` | `"any"` | how a primary opens: `"any"` in the background, left running with Remote Control, else stopped once its turn ends; `"terminal"` in the background, left running; `"vscode"` a VS Code tab you send yourself |
+| `[dispatch] primary_client` | `GNOMONKIT_DISPATCH_PRIMARY_CLIENT` | `"any"` | how a primary opens: `"terminal"` a background process, always on the phone with Remote Control, joined at the desk from its claude.ai/code link or `claude attach` (never the VS Code list: a second process on it exits); `"vscode"` a VS Code tab, on the phone only while VS Code has it open; `"any"` a tab where the `code` command is found, else terminal. `gnomonkit setup remote on` sets `"terminal"` |
+| `[dispatch] tab_seconds` | `GNOMONKIT_DISPATCH_TAB_SECONDS` | `20` | how long dispatch waits for a tab primary's own process after the extension's link (0 to 300; 0 = not at all) |
 | `[dispatch] primary_model` | `GNOMONKIT_DISPATCH_PRIMARY_MODEL` | `""` | model a primary starts on (an alias such as `opus`, or a model id); `""` uses your own default |
 | `[dispatch] primary_effort` | `GNOMONKIT_DISPATCH_PRIMARY_EFFORT` | `"medium"` | effort a primary starts at: `low`, `medium`, `high`, `xhigh`, `max`, or `""` for your own default |
 | `[dispatch] sub_model` | `GNOMONKIT_DISPATCH_SUB_MODEL` | `"sonnet"` | model a sub starts on |

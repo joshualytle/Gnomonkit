@@ -402,8 +402,12 @@ def test_setup_remote_on_merges_the_claude_setting_records_the_answer_and_prints
     assert 'grants add --from "%s" --to "%s" --actions spawn,handoff,stop' % (proj, proj) in out
     assert "accept the" in out and "trust sync" in out
     assert not (home / "grants.toml").exists() and not (home / "trust").exists()
+    # Remote work needs a process that outlives the desk: the primary becomes a background one, and it says why.
+    assert C.lookup(C.read_toml(str(personal(home))), "dispatch.primary_client") == "terminal"
+    assert "outlives the desk" in out and "How a primary session opens" in out
     rc, out, _ = cli(capsys, "setup", "status")
     assert "Remote Control:    on (remoteControlAtStartup" in out
+    assert "Primary client:    dispatch.primary_client = terminal" in out and "WARNING" not in out
 
 
 def test_setup_remote_off_and_status(home, capsys, tmp_path):
@@ -411,7 +415,7 @@ def test_setup_remote_off_and_status(home, capsys, tmp_path):
     rc, out, _ = cli(capsys, "setup", "remote", "off")
     assert rc == 0 and json.loads(p.read_text(encoding="utf-8")) == {"remoteControlAtStartup": False}
     assert C.lookup(C.read_toml(str(personal(home))), "working.remote") == "no"
-    assert "Grants and folder trust are untouched" in out
+    assert "Grants, folder trust and dispatch.primary_client are untouched" in out
     rc, out, _ = cli(capsys, "setup", "remote")
     assert rc == 0 and "Remote Control:    off; run" in out and "<project folder>" in out
     rc, out, _ = cli(capsys, "setup", "remote", "off")
@@ -532,3 +536,33 @@ def test_make_scratch_uses_the_profile_root_when_no_option_is_set(home, tmp_path
     assert ms.scratch_root() == C.resolve_path(str(tmp_path / "my-scratch"))
     monkeypatch.setenv("GNOMONKIT_SCRATCH_ROOT", str(tmp_path / "from-env"))
     assert ms.scratch_root() == str(tmp_path / "from-env")
+
+
+def test_setup_remote_on_keeps_an_explicit_client_and_warns_about_a_tab(home, capsys, tmp_path):
+    _claude_settings(tmp_path)
+    rc, out, _ = cli(capsys, "setup", "remote", "on", "--client", "vscode")
+    assert rc == 0, out
+    assert C.lookup(C.read_toml(str(personal(home))), "dispatch.primary_client") == "vscode"
+    assert "dispatch.primary_client = vscode, as asked" in out and "only while VS Code has it open" in out
+    # The status lines warn as long as the two settings disagree, and `off` leaves the client alone.
+    rc, out, _ = cli(capsys, "setup", "remote", "status")
+    assert rc == 0 and "Primary client:    dispatch.primary_client = vscode" in out and "WARNING" in out
+    rc, out, _ = cli(capsys, "setup", "status")
+    assert "WARNING: dispatch.primary_client is `vscode` while working.remote is yes" in out
+    rc, out, _ = cli(capsys, "setup", "remote", "off")
+    assert rc == 0 and "dispatch.primary_client are untouched" in out
+    assert C.lookup(C.read_toml(str(personal(home))), "dispatch.primary_client") == "vscode"
+    rc, out, _ = cli(capsys, "setup", "status")
+    assert "WARNING" not in out
+    # On again with no --client: back to the default for remote work.
+    rc, out, _ = cli(capsys, "setup", "remote", "on")
+    assert rc == 0 and C.lookup(C.read_toml(str(personal(home))), "dispatch.primary_client") == "terminal"
+
+
+def test_setup_status_notes_an_unset_client_for_someone_who_works_remotely(home, capsys, tmp_path):
+    _claude_settings(tmp_path, {"remoteControlAtStartup": True})
+    rc, out, _ = cli(capsys, "profile", "set", "working.remote=yes")
+    assert rc == 0
+    rc, out, _ = cli(capsys, "setup", "status")
+    assert "Primary client:    dispatch.primary_client = (not set: any)" in out
+    assert "note: that opens a VS Code tab where the `code` command is found" in out and "WARNING" not in out

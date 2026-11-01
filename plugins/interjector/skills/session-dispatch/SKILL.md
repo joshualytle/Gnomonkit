@@ -167,10 +167,22 @@ retires (a session dispatch didn't start counts as the user's primary), and make
 `code` command is found (the default, `primary_client` `"any"`, or the setting `"vscode"`), a new or
 resumed primary is a VS Code tab: dispatch runs its first turn as a one-shot (`claude -p` under a
 fresh session id, no background job), then `code <project>` opens or focuses the project's window
-and the extension's link opens that session there. VS Code's own process carries it from then on, so
+and the extension's link, sent with `code --open-url`, opens that session there. VS Code's own process
+carries it from then on, so
 the tab works, and the phone lists it when Remote Control is on for all sessions (the extension's
-setting, which is `remoteControlAtStartup`). Nothing is typed in for the user to send. When the
-output says the window could not be focused, pass that on. The CLI refuses to resume any session
+setting, which is `remoteControlAtStartup`). Nothing is typed in for the user to send. Dispatch waits
+(`tab_seconds`, default 20) for the tab's own process to appear before it calls the tab open; when
+the output says instead that VS Code is waiting for a click, pass that on word for word. VS Code
+shows "Allow 'Claude Code' extension to open this URI?" the first time an extension receives a
+link and drops the link unanswered after five minutes, so until the user allows it once (the
+dialog's Don't ask again, or the setting `extensions.confirmedUriHandlerExtensionIds`) no
+dispatched tab opens and the phone lists nothing, while the session waits in the project's session
+list. The phone
+lists that tab only while VS Code has it open and running, so for someone who works remotely
+(`working.remote = yes`; `gnomonkit setup remote on` sets `primary_client = "terminal"` for them)
+the right primary is a background one, always on the phone and joined at the desk from its
+claude.ai/code link or `claude attach`; the output says so when a tab opens for such a user, and
+you pass it on. When the output says the window could not be focused, pass that on. The CLI refuses to resume any session
 that was ever a background job ("That session is running in the background"): no tab can take one
 over, a message typed into such a tab is lost, and a resume of one is refused with the fix (start a
 fresh primary with `--replace`).
@@ -225,7 +237,8 @@ or close one yourself.
 Settings (the personal profile's `[dispatch]` table, or the `GNOMONKIT_DISPATCH_*` variables):
 `auto_stop` (default true), `stop_timeout_minutes` (how long the watcher waits for a primary's turn to
 end, default 15, at most 1440), `primary_client` (`"any"`, the default: a VS Code tab where `code`
-is found, else the background; `"terminal"`; or `"vscode"`),
+is found, else the background; `"terminal"`; or `"vscode"`), `tab_seconds` (how long a tab
+primary's own process is waited for after the link, default 20, at most 300, 0 = not at all),
 and the model and effort each role starts with: `primary_model` (default `""`, the user's own),
 `primary_effort` (`"medium"`), `sub_model` (`"sonnet"`), `sub_effort` (`"medium"`).
 They are the user's: don't change them.

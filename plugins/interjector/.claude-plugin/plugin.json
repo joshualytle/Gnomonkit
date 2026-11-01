@@ -1,7 +1,7 @@
 {
   "name": "interjector",
   "description": "Gnomonkit Interjector (opt-in): records what a session does, lets a watcher or you step in at the next tool boundary (comment, block the next matching action, or keep the turn from ending), and makes Claude search your history before asking you a question (core's history index by default, or your own search command), so you correct a guess instead of answering from scratch. Names every session by one scheme (<repo>:<task> by default, or templates you set) and puts all open sessions on one local status page, grouped by project, the ones waiting on you first, empty tabs left out. A session-dispatch skill starts, lists, replaces and stops background sessions in your projects from the session you are in (a fresh session seeded with a handoff when one runs long), under a cap: one primary per project, one session per name, and labelled sub-sessions (sub:<parent>/<task> by default) that are stopped (never deleted) once they have finished; with --work it puts a GitHub work item in the brief and records the start or handoff on the item. Asked by an agent, dispatch and the say, block and hold commands act only where your orchestration grants allow, and log each decision; dispatch never starts a session under a folder you set to the `never` trust level. Local files only; fails open.",
-  "version": "1.6.5",
+  "version": "1.6.9",
   "userConfig": {
     "projects_root": {
       "type": "string",

@@ -281,3 +281,58 @@ def test_estimate_uses_last_round_median(tmp_path):
     (prev / "results.json").write_text(json.dumps({"schema": "gnomonkit-bench/v1", "records": recs}), encoding="utf-8")
     assert estimate(10, prev) == pytest.approx(2.0)
     assert estimate(10, None) == pytest.approx(2.5)
+
+
+def flaky_setup(monkeypatch, fail_times, rep=0):
+    """Fail setup_run `fail_times` times for the given rep with git's stderr, then behave normally."""
+    import subprocess
+    from bench import setup as S
+    from bench import runner as R
+    calls = []
+
+    def fake_setup(run_dir, sc, arm):
+        calls.append(run_dir.name)
+        if run_dir.name.endswith(f"-{rep}") and calls.count(run_dir.name) <= fail_times:
+            raise subprocess.CalledProcessError(128, ["git", "add", "-A"],
+                                                stderr=b"fatal: synthetic index lock held by another process\n")
+        return S.setup_run(run_dir, sc, arm)
+
+    monkeypatch.setattr(R, "setup_run", fake_setup)
+    return calls
+
+
+def test_setup_failing_once_is_retried(tmp_path, arms, monkeypatch):
+    calls = flaky_setup(monkeypatch, fail_times=1)
+    recs = run_round(jobs_of(1), arms, tmp_path / "out", "sonnet", launcher=fake(cost=0.1), allow_host=True)
+    assert calls == ["t01-gnomonkit-0", "t01-gnomonkit-0"]
+    assert len(recs) == 1 and recs[0]["error"] is None and recs[0]["applied"] is True and "setup" not in recs[0]
+
+
+def test_setup_failing_twice_fails_that_run_only(tmp_path, arms, monkeypatch):
+    """Issue #135: a run whose git setup keeps failing is recorded as errored with git's stderr; the
+    round continues, and a first-run setup failure is not mistaken for a broken CLI or login."""
+    calls = flaky_setup(monkeypatch, fail_times=2, rep=0)
+    recs = run_round(jobs_of(2), arms, tmp_path / "out", "sonnet", launcher=fake(cost=0.1), workers=1,
+                     allow_host=True)
+    assert calls.count("t01-gnomonkit-0") == 2 and calls.count("t01-gnomonkit-1") == 1
+    bad, good = recs
+    assert bad["error"] == "setup: git add failed (rc 128)" and bad["error_kind"] == "infra" and bad["setup"] is True
+    assert bad["rc"] == 128 and bad["cost_usd"] == 0 and "synthetic index lock" in bad["stderr"]
+    assert set(bad) >= {"scenario", "family", "polarity", "arm", "rep", "rc", "secs", "billing", "version",
+                        "error", "error_kind", "stderr", "applied", "cost_usd", "turns"}
+    assert good["error"] is None and good["applied"] is True
+    data = json.loads((tmp_path / "out" / "results.json").read_text(encoding="utf-8"))
+    assert len(data["records"]) == 2 and data["records"][0]["setup"] is True
+
+
+def test_setup_oserror_is_recorded_without_a_path(tmp_path, arms, monkeypatch):
+    from bench import runner as R
+
+    def broken(run_dir, sc, arm):
+        raise PermissionError(13, "Permission denied", str(run_dir / "repo" / ".git"))
+
+    monkeypatch.setattr(R, "setup_run", broken)
+    recs = run_round(jobs_of(1), arms, tmp_path / "out", "sonnet", launcher=fake(), allow_host=True)
+    r = recs[0]
+    assert r["error"] == "setup: PermissionError: Permission denied" and r["rc"] is None and r["setup"] is True
+    assert "<run>" in r["stderr"] and str(tmp_path) not in r["stderr"]

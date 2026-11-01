@@ -7,7 +7,9 @@ Safety rails, all on by default:
   * the child environment is an allowlist (setup.round_env), never a copy of the caller's;
   * a timed-out run is killed with its whole process tree, by PID, never by program name;
   * stops scheduling new runs once spent cost reaches max_cost;
-  * stops the round when the first run fails without producing a result (CLI missing, not logged in).
+  * stops the round when the first run fails without producing a result (CLI missing, not logged in);
+  * a run whose repo setup fails (git init/add/commit, disk contention) is retried once, then recorded
+    as an errored run with git's stderr; the round goes on, since nothing about the CLI is broken.
 """
 from __future__ import annotations
 
@@ -121,11 +123,54 @@ def _error_kind(error: str | None) -> str | None:
     return "behaviour" if error == "timeout" or error.startswith("error_max_turns") else "infra"
 
 
+SETUP_ERRORS = (subprocess.CalledProcessError, OSError)
+
+
+def _setup_with_retry(run_dir: Path, sc: Scenario, arm: Arm) -> tuple[Path, dict[str, str]]:
+    """One retry: setup_run clears the run dir itself, so a second call starts from nothing. A second
+    failure is the caller's to record."""
+    try:
+        return setup_run(run_dir, sc, arm)
+    except SETUP_ERRORS:
+        return setup_run(run_dir, sc, arm)
+
+
+def _setup_failure(e: BaseException, run_dir: Path) -> tuple[str, int | None, str]:
+    """(short reason, rc, scrubbed stderr tail) for a setup_run failure."""
+    if isinstance(e, subprocess.CalledProcessError):
+        cmd = e.cmd if isinstance(e.cmd, (list, tuple)) else [str(e.cmd)]
+        verb = next((a for a in cmd[1:] if not a.startswith("-") and "=" not in a), "?")
+        raw = e.stderr or b""
+        text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+        return f"setup: git {verb} failed (rc {e.returncode})", e.returncode, scrub(text[-300:], run_dir)
+    strerror, filename = getattr(e, "strerror", None), getattr(e, "filename", None)
+    reason = f"setup: {type(e).__name__}" + (f": {strerror}" if strerror else "")
+    # str(e) would repr the path (doubled backslashes on Windows), which scrub would not recognise.
+    text = f"{strerror}: {filename}" if strerror and filename else str(e)
+    return reason, None, scrub(text[-300:], run_dir)
+
+
 def _run_one(job: Job, arms: dict[str, Arm], out: Path, model: str, auth_dir: Path | None, launcher: Launcher,
              max_turns: int, timeout: int, billing: str) -> dict:
     sc, arm_name, rep = job
     run_dir = out / f"{sc.name}-{arm_name}-{rep}"
-    repo, additions = setup_run(run_dir, sc, arms[arm_name])
+    t0 = time.time()
+    try:
+        repo, additions = _setup_with_retry(run_dir, sc, arms[arm_name])
+    except SETUP_ERRORS as e:
+        # The run never started, so it is an infra error; `setup` marks it as this run's problem, not
+        # the CLI's, so run_round's first-run check lets the round continue.
+        error, rc, err_tail = _setup_failure(e, run_dir)
+        rec = {"scenario": sc.name, "family": sc.family, "polarity": sc.polarity, "arm": arm_name, "rep": rep,
+               "rc": rc, "secs": round(time.time() - t0, 1), "billing": billing, "version": None,
+               "error": error, "error_kind": _error_kind(error), "setup": True, "stderr": err_tail,
+               "applied": None, "fired_before_action": None, "noise": 0.0, "cost_usd": 0.0, "turns": 0}
+        try:
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "record.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
+        except OSError:
+            pass                        # the record still reaches results.json
+        return rec
     env = {**round_env(run_dir / "env", billing, auth_dir=auth_dir), **additions}
     cmd = build_cmd(sc, arms[arm_name], empty_mcp_config(run_dir), model, max_turns)
     stream_path = run_dir / "stream.jsonl"
@@ -182,7 +227,10 @@ def run_round(jobs: list[Job], arms: dict[str, Arm], out: Path, model: str, *,
 
     def check_first(rec: dict) -> None:
         # A broken setup (CLI missing, not logged in, bad key) fails before any model work, so it costs
-        # nothing. A first run that timed out or ran out of turns is a result, not a broken setup.
+        # nothing. A first run that timed out or ran out of turns is a result, not a broken setup; a
+        # failed repo setup (`setup` flag) is one run's disk trouble, not the CLI's, so the round goes on.
+        if rec.get("setup"):
+            return
         if rec["error_kind"] == "infra" and not rec.get("cost_usd"):
             raise BenchAbort(f"first run failed before doing any work (rc {rec['rc']}, {rec['error']}): "
                              f"{rec['stderr'][-300:]}")

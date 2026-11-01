@@ -69,9 +69,10 @@ PENDING = "name:"                     # a record whose id `claude --bg` did not 
 GH_TIMEOUT_S = 15
 SCAN_BYTES = 2_000_000                # how far into a transcript the empty check reads before giving up
 TAIL_BYTES = 512_000                  # how much of a transcript's end is read for its last reply
-DEFAULTS = {"auto_stop": True, "stop_timeout_minutes": 15, "primary_client": "any",
+DEFAULTS = {"auto_stop": True, "stop_timeout_minutes": 15, "primary_client": "any", "tab_seconds": 20,
             "primary_model": "", "primary_effort": "medium", "sub_model": "sonnet", "sub_effort": "medium"}
 MAX_TIMEOUT_MINUTES = 24 * 60
+MAX_TAB_SECONDS = 300
 CLIENTS = ("any", "terminal", "vscode")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 _MODEL = re.compile(r"[a-z0-9][a-z0-9.\[\]-]{0,63}$")   # an alias or an id; nothing a shell would re-read
@@ -477,6 +478,9 @@ def _valid(name: str, v):
     if name == "stop_timeout_minutes":
         ok = isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
         return min(v, MAX_TIMEOUT_MINUTES) if ok else None
+    if name == "tab_seconds":
+        ok = isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0
+        return min(v, MAX_TAB_SECONDS) if ok else None
     if name == "primary_client":
         return v.lower() if isinstance(v, str) and v.lower() in CLIENTS else None
     if name.endswith("_model"):
@@ -506,7 +510,7 @@ def _from_text(name: str, raw: str):
     s = raw.strip().lower()
     if name == "auto_stop":
         return True if s in _TRUE else False if s in _FALSE else None
-    if name == "stop_timeout_minutes":
+    if name in ("stop_timeout_minutes", "tab_seconds"):
         try:
             return _valid(name, float(s))
         except ValueError:

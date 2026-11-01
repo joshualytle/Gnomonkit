@@ -4,12 +4,14 @@
     gnomonkit setup done       the user went through setup: the first-run offer stops
     gnomonkit setup skipped    the user declined it: the offer stops ("Gnomonkit setup" restarts it any time)
     gnomonkit setup security   terminal only: the settings that are permissions, which an agent may not set
-    gnomonkit setup remote on|off|status [--project DIR ...]
+    gnomonkit setup remote on|off|status [--project DIR ...] [--client terminal|vscode|any]
                                for someone who works remotely or from the phone a lot: turns Claude Code's
                                remoteControlAtStartup on (user settings, CLAUDE_CONFIG_DIR honoured, the
-                               old file kept as .bak) and records working.remote in the personal profile,
-                               then prints what they must do themselves, per project: the grants that let
-                               a project's sessions start, hand off to and stop their own, and folder trust
+                               old file kept as .bak), records working.remote in the personal profile and
+                               sets dispatch.primary_client to terminal (a process that outlives the desk,
+                               so the phone always sees it) unless --client says otherwise, then prints what
+                               they must do themselves, per project: the grants that let a project's
+                               sessions start, hand off to and stop their own, and folder trust
 
 The state lives in ~/.gnomonkit/onboarding.json. The conversation itself is the core `onboarding` skill.
 `status` also gives this machine's kind and its memory backend: on a personal machine where MemPalace
@@ -47,6 +49,23 @@ REMOTE_EXPLAINED = (
     "Gnomonkit starts for you in the background read the same setting and start with it too, and a "
     "primary started that way is left running, since the phone lists only running sessions."
 )
+CLIENT_SETTING = "dispatch.primary_client"
+CLIENT_VALUES = ("terminal", "vscode", "any")
+REMOTE_CLIENT = "terminal"
+# How a primary session dispatch starts opens, and what each choice gives someone who is often away
+# from the desk. The desk route for a running background session is never the VS Code tab: a second
+# process on the same conversation exits at once and loses what was typed.
+CLIENT_TRADEOFF = """How a primary session opens (dispatch.primary_client):
+  terminal  a background process with Remote Control: always on the phone and at its claude.ai/code
+            link; at the desk open it in the browser or with `claude attach <id>`, not from the
+            VS Code session list (a second process on it exits and loses your message)
+  vscode    a VS Code tab: on the desk, and on the phone only while VS Code has the tab open and
+            running; closed, or VS Code shut, it is idle and the phone does not list it
+  any       a tab where the `code` command is found, else terminal"""
+CLIENT_WHY = ("Remote work needs a process that outlives the desk, so %s is now `%s`"
+              " (`%s` changes it, `--client` picks another)." % (CLIENT_SETTING, REMOTE_CLIENT, "{how}"))
+CLIENT_WARNING = ("%s is `vscode` while working.remote is yes: the phone sees that tab only while VS Code "
+                  "has it open. Run `{how}` for a primary that is always on the phone." % CLIENT_SETTING)
 COMING = ("Nothing to set here yet. The permissions an agent may not choose for you, which projects a session "
           "may start or steer sessions in (orchestration grants) and how far each folder is trusted, arrive in "
           "a coming release, and this command will ask about them then. Nothing was changed.")
@@ -127,6 +146,10 @@ def register(sub) -> None:
     p.add_argument("value", nargs="?", choices=REMOTE_VALUES, help="for remote: on, off or status (default)")
     p.add_argument("--project", action="append", default=[], metavar="DIR",
                    help="for remote: a project you dispatch sessions from; prints its checklist (repeat for more)")
+    p.add_argument("--client", choices=CLIENT_VALUES, default=None,
+                   help="for remote on: how a primary opens (default terminal: a background process the phone "
+                        "always sees; vscode: a tab the phone sees only while it is open; any: a tab where "
+                        "the code command is found, else terminal)")
     for _order, _name, mod in _security_modules():
         add = getattr(mod, "security_arguments", None)
         if callable(add):
@@ -170,6 +193,7 @@ def status() -> int:
         print("                   %s" % extra)
     print("Launcher:          %s" % _launcher_line())
     print("Remote Control:    %s" % remote_line())
+    print("Primary client:    %s" % client_line())
     print("Security settings: run `%s` in a terminal yourself" % C.command_line("setup", "security"))
     if os.environ.get("GNOMONKIT_NO_ONBOARDING"):
         print("(GNOMONKIT_NO_ONBOARDING is set, so sessions here never offer setup.)")
@@ -253,14 +277,38 @@ def remote_checklists(projects: list) -> str:
                      for p in projects)
 
 
+def primary_client() -> str | None:
+    """The profile's dispatch.primary_client, or None when it is unset or not a known choice."""
+    path, _source = C.personal_profile_path()
+    value = C.lookup(C.read_toml(path) if os.path.isfile(path) else None, CLIENT_SETTING)
+    return value if value in CLIENT_VALUES else None
+
+
+def client_line() -> str:
+    """One line for `setup status` and `setup remote status`: the client, with the warning for someone who
+    works remotely but would get a tab the phone sees only while it is open."""
+    client = primary_client()
+    _wanted, answer = remote_state()
+    line = "%s = %s" % (CLIENT_SETTING, client or "(not set: any)")
+    if answer == "yes" and client == "vscode":
+        line += "\n  WARNING: " + CLIENT_WARNING.format(how=C.command_line("setup", "remote", "on"))
+    elif answer == "yes" and client != "terminal":
+        line += ("\n  note: that opens a VS Code tab where the `code` command is found, which the phone sees only "
+                 "while the tab is open; `%s` sets terminal" % C.command_line("setup", "remote", "on"))
+    return line
+
+
 def remote(args) -> int:
     value = args.value or "status"
     wanted, answer = remote_state()
     if value == "status":
         print("Remote Control:    %s" % remote_line())
         print("Profile:           working.remote = %s" % (answer or "(not set)"))
+        print("Primary client:    %s" % client_line())
         print()
         print(REMOTE_EXPLAINED)
+        print()
+        print(CLIENT_TRADEOFF)
         print()
         print("Still yours to do, per project you dispatch sessions from:")
         print(remote_checklists(args.project))
@@ -283,7 +331,14 @@ def remote(args) -> int:
         print("saved %s: %s = %s%s" % (path, REMOTE_SETTING, "true" if want else "false",
                                        " (previous version: %s)" % backup if backup else ""))
     from . import profile
-    rc = profile.cmd_set(types.SimpleNamespace(pairs=["working.remote=%s" % ("yes" if want else "no")], file=None))
+    pairs = ["working.remote=%s" % ("yes" if want else "no")]
+    client = getattr(args, "client", None)
+    if want:
+        # A tab is on the phone only while the desk has it open; a background primary always is.
+        pairs.append("%s=%s" % (CLIENT_SETTING, client or REMOTE_CLIENT))
+    elif client:
+        pairs.append("%s=%s" % (CLIENT_SETTING, client))
+    rc = profile.cmd_set(types.SimpleNamespace(pairs=pairs, file=None))
     if rc:
         return rc
     print()
@@ -291,11 +346,20 @@ def remote(args) -> int:
         print(REMOTE_EXPLAINED)
         print("It takes effect in sessions started from now on (a session that is already open keeps what it had).")
         print()
+        if client and client != REMOTE_CLIENT:
+            print("%s = %s, as asked. %s" % (CLIENT_SETTING, client,
+                                            CLIENT_WARNING.format(how=C.command_line("setup", "remote", "on"))
+                                            if client == "vscode" else ""))
+        else:
+            print(CLIENT_WHY.format(how=C.command_line("profile", "set", CLIENT_SETTING + "=<choice>")))
+        print(CLIENT_TRADEOFF)
+        print()
         print("Still yours to do, per project you dispatch sessions from:")
         print(remote_checklists(args.project))
     else:
         print("Sessions started from now on connect no Remote Control unless started with --remote-control. "
-              "Grants and folder trust are untouched: `%s` lists them." % C.command_line("grants", "list"))
+              "Grants, folder trust and %s are untouched: `%s` lists the grants."
+              % (CLIENT_SETTING, C.command_line("grants", "list")))
     return 0
 
 
