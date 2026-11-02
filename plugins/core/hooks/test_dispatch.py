@@ -119,16 +119,19 @@ with tempfile.TemporaryDirectory() as tmp:
     check("usage_allocation" in [n for n, _ in dispatch.HOOKS["UserPromptSubmit"]], "the usage hook is dispatched")
 
     # 6. Same output as the standalone skill_router on a trigger-matching call (the real rules, real merge).
+    # Each run gets its own router state: the router shows a suggestion once per sitting, so a shared
+    # state would leave the second run quiet. The probe must fire, or the comparison proves nothing.
     probe = bash("git push origin main")
-    a = run("skill_router.py", probe)
-    b = run("dispatch.py", probe)
+    a = run("skill_router.py", probe, {"GNOMONKIT_ROUTER_STATE_DIR": os.path.join(tmp, "router-a")})
+    b = run("dispatch.py", probe, {"GNOMONKIT_ROUTER_STATE_DIR": os.path.join(tmp, "router-b")})
     ctx_a = json.loads(a[1])["hookSpecificOutput"]["additionalContext"] if a[1].strip() else ""
     ctx_b = ""
     for line in b[1].splitlines():
         if line.startswith("{"):
             ctx_b = json.loads(line)["hookSpecificOutput"]["additionalContext"]
     check(a[0] == b[0] == 0, "router exit codes")
-    check(ctx_a == "" or ctx_a in ctx_b, "router context is carried by the dispatcher")
+    check(ctx_a != "", "the router probe matches a rule")
+    check(ctx_a in ctx_b, "router context is carried by the dispatcher")
 
 # 7. hooks.json: each dispatcher entry's matcher is the union the table needs, and nothing else dispatches.
 hj = json.load(open(os.path.join(HERE, "hooks.json"), encoding="utf-8"))["hooks"]

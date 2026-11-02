@@ -208,7 +208,12 @@ def _effectiveness(m: dict, lab: Labeller, titles: dict) -> dict | None:
         hooks = {}
         rt = hk.get("router")
         if isinstance(rt, dict):
-            hooks["router"] = _group_rows(rt)[:TOP_ROWS]
+            # name each skill by the plugin that suggested it most, so core's rows stay apart from an overlay's
+            def src(k, v):
+                by = v.get("by") if isinstance(v.get("by"), dict) else {}
+                top = max(by, key=lambda b: by[b] if _num(by[b]) else 0, default="")
+                return "%s:%s" % (top, k) if top and top != "unknown" else k
+            hooks["router"] = _group_rows({src(k, v): v for k, v in rt.items() if isinstance(v, dict)})[:TOP_ROWS]
         for k in ("interlock", "correction_watch", "freshness", "palace"):
             if isinstance(hk.get(k), dict):
                 hooks[k] = nums(hk[k])

@@ -253,6 +253,43 @@ def test_unlinked_and_aggregates(home, gk, tmp_path):
     assert h["tokens_saved"]["label"] == "ESTIMATED"
 
 
+def test_router_split_by_source_self_invoked_and_followed(tmp_path, gk):
+    """Suggestions keep the plugin that made them; already-loaded ones leave the uptake share; a
+    suggestion acted on without a load shows as followed; Skill calls nobody suggested are counted apart."""
+    h = tmp_path / "claude-split"
+    write(h / "projects" / "p" / "s.jsonl", [
+        prompt("go"),
+        a_turn("k1", tool_use("S1", "Skill", skill="lib:brainstorming")),
+        result("S1", "loaded"),
+        a_turn("k2", tool_use("S2", "Skill", skill="core:report-pages")),
+        result("S2", "loaded"),
+        a_turn("k3", tool_use("S3", "Write", file_path="/w/report.html")),
+        hook("PreToolUse", "S3", "  skill: core:report-pages\n  skill: lib:helper  (router: overlay)"),
+        result("S3", "ok"),
+        a_turn("k4", tool_use("S4", "Bash", command="gh pr merge 3 --rebase")),
+        hook("PostToolUse", "S4", "  skill: overlay:merged-is-not-shipped"),
+        result("S4", "merged"),
+        a_turn("k5", tool_use("S5", "Bash", command="claude plugin update core@example")),
+        result("S5", "updated"),
+    ])
+    rules = tmp_path / "rules.json"
+    rules.write_text(json.dumps({"triggers": [
+        {"skill": "merged-is-not-shipped", "follow_through": ["plugin\\s+update\\b", "("]}]}))   # "(" is skipped
+    m = E.collect(30, home=h, gk=gk, cache_path=None, now=NOW, triggers=[rules, tmp_path / "missing.json"])
+    r = m["hooks"]["router"]
+    assert r["report-pages"]["already_loaded"] == 1 and r["report-pages"]["open"] == 0
+    assert r["report-pages"]["uptake"] is None
+    assert r["helper"]["by"] == {"overlay": 1}                     # the router mark wins over the name's prefix
+    ship = r["merged-is-not-shipped"]
+    assert ship["by"] == {"overlay": 1} and ship["taken"] == 0 and ship["uptake"] == 0.0
+    assert ship["followed"] == 1 and ship["follow_through"] == 1.0
+    assert m["hooks"]["skills_self"] == {"lib:brainstorming": 1, "core:report-pages": 1}
+    su = by_id(m)["skill_uptake"]
+    assert su["n"] == 1 and su["value"] == 0.0                     # the already-loaded one is out of n
+    d = su["detail"]
+    assert (d["suggestions"], d["suggestions_open"], d["suggestions_already_loaded"]) == (2, 1, 1)
+
+
 def test_digest(home, gk, tmp_path):
     d = run(home, gk, tmp_path)["digest"]
     assert d["calls"] == 3 and d["known"] == 3
@@ -282,10 +319,14 @@ def test_digest_is_a_setting(home, gk, tmp_path, monkeypatch):
 
 
 def test_hooks(home, gk, tmp_path):
-    hk = run(home, gk, tmp_path)["hooks"]
+    hk = run(home, gk, tmp_path, triggers=[])["hooks"]
     r = hk["router"]
-    assert r["ship-through-prs"] == {"suggested": 1, "taken": 1, "already_loaded": 0, "scratch_paths": 0, "uptake": 1.0}
+    assert r["ship-through-prs"] == {"suggested": 1, "taken": 1, "already_loaded": 0, "scratch_paths": 0,
+                                     "followed": 0, "by": {"core": 1}, "open": 1, "uptake": 1.0,
+                                     "follow_through": None}
     assert r["diff-review"]["taken"] == 0 and r["diff-review"]["uptake"] == 0.0
+    assert r["diff-review"]["by"] == {"unknown": 1}                # a suggestion line with no plugin prefix
+    assert hk["skills_self"] == {}                                  # the one Skill call followed a suggestion
     assert r["report-pages"]["taken"] == 1 and r["report-pages"]["scratch_paths"] == 1   # taken by reading SKILL.md
     assert hk["interlock"]["blocks"] == 3
     assert hk["interlock"]["outcomes"] == {"override_after_listing": 1, "rewritten": 1, "abandoned": 1}

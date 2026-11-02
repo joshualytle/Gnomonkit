@@ -128,6 +128,36 @@ def _repo_of(cwd: str) -> str:
     return os.path.basename((cwd or "").rstrip("\\/")).lower()
 
 
+def branch_of(cwd: str) -> str:
+    """The branch checked out at or above `cwd`, from .git/HEAD; "" when unknown or detached.
+
+    A file read, never a git call: this runs on every matching shell command. A linked worktree's
+    .git is a file naming its git dir, which holds that worktree's own HEAD.
+    """
+    d = os.path.abspath(cwd) if cwd else ""
+    while d:
+        dot = os.path.join(d, ".git")
+        try:
+            if os.path.isfile(dot):
+                with open(dot, encoding="utf-8") as fh:
+                    line = fh.readline().strip()
+                if not line.startswith("gitdir:"):
+                    return ""
+                gd = line[len("gitdir:"):].strip()
+                dot = gd if os.path.isabs(gd) else os.path.join(d, gd)
+            if os.path.isdir(dot):
+                with open(os.path.join(dot, "HEAD"), encoding="utf-8") as fh:
+                    head = fh.readline().strip()
+                return head[len("ref: refs/heads/"):] if head.startswith("ref: refs/heads/") else ""
+        except (OSError, ValueError):
+            return ""
+        up = os.path.dirname(d)
+        if up == d:
+            return ""
+        d = up
+    return ""
+
+
 # A command QUOTED inside echo/printf/grep is being displayed, not run. The
 # destructive interlock learned this first; a router that suggests diff-review
 # because someone echoed the words "git commit" is noise of the worst kind,
@@ -172,7 +202,14 @@ def match(rules: list, tool: str, command: str, path: str, cwd: str) -> list:
         hit = False
         if command and not _DISPLAYED.search(command):
             for pat in r.get("command_patterns") or []:
-                if re.search(pat, command, re.I):
+                if isinstance(pat, dict):
+                    # {pattern, branches}: the command alone is the compliant action on a
+                    # feature branch and the risky one on main, so it counts only on those.
+                    want = [b.lower() for b in (pat.get("branches") or [])]
+                    if want and (branch_of(cwd) or "").lower() not in want:
+                        continue
+                    pat = pat.get("pattern") or ""
+                if pat and re.search(pat, command, re.I):
                     hit = True
                     break
         if not hit and path:
@@ -333,8 +370,10 @@ def main() -> int:
     for r in fresh:
         say = " ".join((r.get("say") or "").split())
         when = " ".join((r.get("when") or "").split())
-        name = r["skill"] if ":" in r["skill"] else f"{plugin}:{r['skill']}"
-        lines.append(f"  skill: {name}")
+        # another plugin's skill keeps its own name, and the mark tells the effectiveness report whose rule it was
+        own = ":" not in r["skill"]
+        name = f"{plugin}:{r['skill']}" if own else r["skill"]
+        lines.append(f"  skill: {name}" if own else f"  skill: {name}  (router: {plugin})")
         lines.append(f"    {say}")
         lines.append(f"    its stated trigger: {when}")
         also = [x for x in (rel.get(r["skill"]) or [])][:3]

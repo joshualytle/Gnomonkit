@@ -3,6 +3,65 @@
 Each entry names the plugins it changes. Versions follow semantic versioning per plugin; the
 version guard in the test suite requires a bump whenever a plugin's hooks or skills change.
 
+## core 1.9.2
+
+- **The destructive-command interlock covers four more kinds of loss.** `git reset --hard`
+  (uncommitted changes), `git clean` with force (untracked and ignored files), Docker volume removal
+  (`docker volume rm` and `prune`, `system prune --volumes`, `compose down -v`), and infrastructure
+  destroys (`terraform`, `tofu` or `terragrunt destroy`, `apply -destroy`). Must-allow cases keep
+  the safe neighbours quiet: `reset --soft`, unstaging a file, `clean -n`, `docker volume ls`, a plain
+  `compose down`, `terraform plan -destroy`.
+- `ship-through-prs` no longer reads a trailing `# ...` comment as part of a push: a branch delete
+  whose comment mentioned main fired it.
+
+## core 1.9.1
+
+- **The destructive-command interlock catches the other common spellings.** Recursive deletes with
+  separate or long flags (`rm -r -f`, `rm --recursive --force`), PowerShell `Remove-Item -Recurse`
+  and its abbreviations, cmd `rd /s`, `rmdir /s` and `del /s`; force pushes as `git push -f`, a
+  bundled `-uf` and a `+` refspec; and `kubectl delete namespace`. Each has must-allow neighbours
+  (`rm -r` alone, `git push -u`, `--force-with-lease`, `kubectl get ns`, `dir /s`).
+- New `docs/THREAT-MODEL.md`: who the blocking hooks are for, how each fails, what the interlock
+  covers and what it does not. `SECURITY.md` links to it.
+
+## core 1.9.0
+
+- **Three router triggers stop firing on the compliant action.** `ship-through-prs` fires on a push
+  that names main or master, and on a commit or bare push from a checkout on main or master. It no
+  longer fires on `gh pr create` or `git push -u`. `diff-review` keeps the feat/fix commit pattern
+  and drops `gh pr checkout` and `gh pr diff`. `folder-placement` stays quiet for a worktree or
+  clone into `.claude/worktrees/` or `<repo>.worktrees/`; the drive-root mkdir pattern is unchanged.
+- **A trigger pattern can depend on the branch.** A `command_patterns` entry may be
+  `{pattern, branches}`, which counts only when the working folder's checkout is on one of those
+  branches. The router reads `.git/HEAD` (a linked worktree's too) and never runs git. Fixtures for
+  such a rule are `{command, branch}`.
+- The dispatcher test's router probe now has to fire. It used a command no rule matched, so the
+  comparison passed without comparing anything.
+
+## core 1.8.1
+
+- **A router can name itself on a suggestion line.** A router whose rules point at other plugins'
+  skills prints the skill's own name followed by `(router: <plugin>)`, so the Skill call stays right
+  and the effectiveness report still knows whose rule fired. The mark wins over the name's prefix in
+  `by`. Core's router adds it when a rule names another plugin's skill; a private overlay's copy of
+  the router should do the same. Rescans the cache once (SCAN_VERSION 12).
+
+## core 1.8.0, portal 1.0.1
+
+- **Skill uptake leaves out suggestions of a skill already loaded.** Loading it again changes nothing,
+  so those suggestions counted against the rate without measuring anything. They stay in the counts as
+  `already_loaded`; uptake is now taken over `open` (suggested minus already loaded).
+- **Each router row names its source.** `by` counts the suggestions per plugin prefix from the
+  suggestion line, so core's rules and a private overlay's rules no longer mix in one row. The portal
+  names each skill by its main source.
+- **Follow-through.** A trigger rule can list `follow_through` shell patterns (with `follow` fixtures
+  the router test checks). The report counts a suggestion as `followed` when a matching command runs
+  within the uptake window, so advice acted on without loading the skill shows. Patterns come from
+  core's rules, `GNOMONKIT_TRIGGER_FILES`, and each installed plugin's `hooks/triggers.json`. Core's
+  ship-through-prs and merged-is-not-shipped rules carry the first patterns.
+- **Self-invoked skill calls.** `hooks.skills_self` counts Skill calls that no suggestion led to.
+- The scan format changed (SCAN_VERSION 11), so cached transcripts are rescanned once.
+
 ## interjector 1.6.9
 
 - **Comment only.** `open_uri`'s docstring gives the reason for `code --open-url` by its mechanism.

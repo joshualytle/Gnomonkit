@@ -100,9 +100,10 @@ Every figure carries MEASURED (an exact usage field or a count) or ESTIMATED
   target and a status (ok / warn / fail, or no-data below the row's minimum
   sample). The targets sit in one table at the top of the readiness code
   (`READINESS_TARGETS`); they are starting points to tune. Rows:
-  - *skill uptake*: of the router's suggestions of a core skill, the share
-    taken up (a Skill call for that skill, or a Read of its SKILL.md, within
-    a few tool calls), the same count as the hooks section's router uptake;
+  - *skill uptake*: of the router's suggestions of a core skill not already
+    loaded, the share taken up (a Skill call for that skill, or a Read of its
+    SKILL.md, within a few tool calls), the same count as the hooks section's
+    router uptake;
   - *interlock false blocks* (a proxy): blocks where an equivalent command
     (same program, same targets, every flag kept) then ran unblocked without
     the override marker, or the user's next prompt let the command through
@@ -190,7 +191,13 @@ Every figure carries MEASURED (an exact usage field or a count) or ESTIMATED
   delegating, or to delegate with a tighter brief.
 - Low uptake for a router suggestion is a finding about the trigger, not proof
   the skill is useless: check whether it fired on scratch paths (counted
-  separately) or for a skill already loaded.
+  separately), and read `followed` beside it. The suggestion text carries the
+  skill's main point, so an agent can act on it without loading the skill; a
+  rule's `follow_through` patterns count that.
+- Keep the sources apart. Each router row's `by` names the plugin whose
+  router made the suggestion, so core's rules are judged on core's rows and a
+  private overlay's on its own. `skills_self` counts the Skill calls no
+  suggestion led to: the agent chose those from its skill list.
 - Read each activity against its context carry. When carry dominates, the
   fix is a smaller context (a fresh session, a subagent for the long read, a
   lower budget), not a cheaper action. A process with a high cost per run

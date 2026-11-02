@@ -75,20 +75,42 @@ DESTRUCTIVE = [
      "the volume group or logical volume and its contents"),
     ("Kubernetes volume", r"kubectl\s+delete\s+(?:pvc|pv|persistentvolume\w*|statefulset)\b",
      "the PersistentVolume and the data on it"),
+    ("Kubernetes namespace", r"kubectl\s+delete\s+(?:namespaces?|ns)\b",
+     "every resource in the namespace, its volume claims included"),
     ("force pod delete", r"kubectl\s+delete\b[^\n]*(?:--force|--grace-period[= ]0)",
      "orphaned CSI mounts the kubelet will recreate from the pod directory"),
     ("database drop", r"\b(?:DROP\s+(?:DATABASE|TABLE|SCHEMA)|TRUNCATE\s+TABLE)\b",
      "the table or database and every row in it"),
     ("restore over live", r"\b(?:psql|mysql|mariadb)\b[^\n]*<[^\n]*\.(?:sql|dump)\b",
      "the current contents of the target database"),
-    ("recursive delete", r"\brm\s+(?:-\w*[rR]\w*f|-\w*f\w*[rR])\b",
+    # Recursive and force as one flag or several, short or long, in either order (`rm -r -f`,
+    # `rm --recursive --force`, PowerShell's `rm -r -fo`).
+    ("recursive delete", r"\brm\b(?=[^\n]*\s(?:-(?!-)\w*[rR]|--recursive\b))(?=[^\n]*\s(?:-(?!-)\w*f|--force\b))",
      "the directory tree and everything under it"),
-    ("force push", r"\bgit\s+push\b[^\n]*--force(?!-with-lease)",
+    # PowerShell deletes a tree with -Recurse alone (any prefix of it), and cmd with /s.
+    ("recursive delete", r"\b(?:Remove-Item|ri)\b(?=[^\n]*\s-rec?(?:u(?:r(?:s(?:e)?)?)?)?\b)",
+     "the directory tree and everything under it"),
+    ("recursive delete", r"\b(?:rd|rmdir|del|erase)\b(?=[^\n]*\s/s\b)",
+     "the directory tree and everything under it"),
+    # --force, -f (alone or bundled), or a refspec with a leading + all overwrite the remote.
+    ("force push", r"\bgit\s+push\b[^\n]*?(?:--force(?!-with-lease|-if-includes)|\s-(?!-)\w*f|\s\+[\w./:-])",
      "commits on the remote that nobody has fetched"),
     ("bucket delete", r"\b(?:aws\s+s3\s+rm\b[^\n]*--recursive|rclone\s+(?:purge|delete)\b|gsutil\s+rm\b[^\n]*-r)",
      "the objects under that prefix, with no undo"),
     ("branch delete", r"\bgit\s+(?:branch\s+-D|push\b[^\n]*--delete)\b",
      "the branch and any commits reachable only from it"),
+    ("hard reset", r"\bgit\s+reset\b[^\n]*\s--hard\b",
+     "uncommitted changes to tracked files, which no commit holds"),
+    # A dry run (-n, --dry-run) lists what would go and removes nothing.
+    ("untracked clean", r"\bgit\s+clean\b(?![^\n]*\s(?:-(?!-)\w*n|--dry-run\b))(?=[^\n]*\s(?:-(?!-)\w*f|--force\b))",
+     "untracked files git never stored, ignored ones too with -x"),
+    ("Docker volume", r"\bdocker\s+(?:volume\s+(?:rm|prune)|system\s+prune\b[^\n]*\s--volumes)\b",
+     "the volume and the data on it"),
+    ("Docker volume", r"\bdocker(?:\s+|-)compose\b[^\n]*\sdown\b[^\n]*\s(?:-(?!-)\w*v|--volumes\b)",
+     "the project's named volumes and the data on them"),
+    # `plan -destroy` only shows what a destroy would do.
+    ("infrastructure destroy", r"\b(?:terraform|tofu|terragrunt)\b[^\n]*\s(?:destroy\b|apply\b[^\n]*\s-destroy\b)",
+     "every resource the state manages, databases and buckets included"),
 ]
 
 # Commands whose quoted arguments are TEXT: a pattern, a message, a body, file content. A

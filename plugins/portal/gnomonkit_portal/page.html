@@ -292,8 +292,8 @@ function renderEffectiveness(sec, box) {
     const il = hk.interlock || {}, pal = hk.palace || {};
     const p = panel("Hooks", tiles([[num(il.blocks), "interlock blocks"], [num((hk.correction_watch || {}).fires), "correction-watch fires"],
       [num((hk.freshness || {}).notices), "freshness notices"], [pct(pal.cite_rate), "precedent cited", num(pal.cited) + " of " + num(pal.injected)]]));
-    if ((hk.router || []).length) p.append(fold("Skill router uptake (" + hk.router.length + " skills)", table(["Skill", "Suggested", "Loaded", "Uptake"],
-      hk.router.map(r => [r.name, num(r.suggested), num(r.taken), pct(r.uptake)]), [1, 2, 3])));
+    if ((hk.router || []).length) p.append(fold("Skill router uptake (" + hk.router.length + " skills)", table(["Skill", "Suggested", "Loaded", "Uptake", "Followed"],
+      hk.router.map(r => [r.name, num(r.suggested), num(r.taken), pct(r.uptake), pct(r.follow_through)]), [1, 2, 3, 4])));
     box.append(p);
   }
   if (sec.digest) box.append(panel("Output digest", tiles([[num(sec.digest.calls), "calls"], [num(sec.digest.saved_tokens), "tokens saved", "ESTIMATED"],

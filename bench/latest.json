@@ -1,0 +1,60 @@
+{
+  "round": "2026-11-01",
+  "model": "sonnet",
+  "reps": 3,
+  "mode": "container",
+  "tally": {
+    "skills": {
+      "bare": [
+        12,
+        30
+      ],
+      "written": [
+        19,
+        30
+      ],
+      "gnomonkit": [
+        18,
+        30
+      ]
+    },
+    "precedent": {
+      "bare": [
+        3,
+        24
+      ],
+      "written": [
+        24,
+        24
+      ]
+    },
+    "guards": {
+      "bare": [
+        9,
+        9
+      ],
+      "written": [
+        9,
+        9
+      ],
+      "gnomonkit": [
+        9,
+        9
+      ]
+    },
+    "interjection": {
+      "bare": [
+        0,
+        18
+      ],
+      "written": [
+        7,
+        18
+      ],
+      "gnomonkit": [
+        12,
+        18
+      ]
+    }
+  }
+}

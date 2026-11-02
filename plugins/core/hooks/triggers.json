@@ -8,20 +8,20 @@
         "PowerShell"
       ],
       "command_patterns": [
-        "git\\s+commit\\b[^|;]*-m\\s*[\"']?\\s*(feat|fix)\\s*[(:]",
-        "gh\\s+pr\\s+(checkout|diff)\\b"
+        "git\\s+commit\\b[^|;]*-m\\s*[\"']?\\s*(feat|fix)\\s*[(:]"
       ],
-      "say": "This is a feature-labelled commit or someone else's branch. diff-review separates must-fix from nice-to-have and hunts swallowed failures.\n",
+      "say": "This is a feature-labelled commit. diff-review separates must-fix from nice-to-have and hunts swallowed failures.\n",
       "fixtures": {
         "fire": [
           "git commit -m \"feat(auth): add token refresh\"",
-          "git commit -m \"fix(api): null guard\"",
-          "gh pr checkout 214"
+          "git commit -m \"fix(api): null guard\""
         ],
         "quiet": [
           "git commit -m \"docs: typo\"",
           "git status",
           "gh pr list",
+          "gh pr checkout 214",
+          "gh pr diff 214",
           "echo \"git commit -m feat(x): y\""
         ]
       }
@@ -234,24 +234,75 @@
     },
     {
       "skill": "ship-through-prs",
-      "when": "opening a pull request, or pushing a branch that will become one\n",
+      "when": "\"before any commit or push ... Especially when the target branch is one a host deploys from\"\n",
       "tools": [
         "Bash",
         "PowerShell"
       ],
       "command_patterns": [
-        "gh\\s+pr\\s+create\\b",
-        "git\\s+push\\s+(-u|--set-upstream)\\b"
+        "git\\s+push\\b[^|;&#]*\\s(\\S+:)?(main|master)(?![\\w/.:-])",
+        {
+          "pattern": "git\\s+commit\\b",
+          "branches": [
+            "main",
+            "master"
+          ]
+        },
+        {
+          "pattern": "git\\s+push(\\s+-[\\w-]+)*(\\s+[\\w.-]+)?\\s*($|[|;&])",
+          "branches": [
+            "main",
+            "master"
+          ]
+        }
       ],
-      "say": "Opening a PR. The gates only run on the PR, so what lands here is what reviewers and CI actually see.\n",
+      "say": "This lands on main without a PR. The gates only run on the PR, so branch first and open one.\n",
+      "follow_through": [
+        "gh\\s+pr\\s+(checks|view|create)\\b",
+        "gh\\s+run\\s+(watch|view|list)\\b"
+      ],
       "fixtures": {
         "fire": [
-          "gh pr create --fill --base dev",
-          "git push -u origin feat/thing"
+          "git push origin main",
+          "git push origin HEAD:main",
+          "git push --force origin master",
+          "git push origin main  # ship it",
+          {
+            "command": "git commit -m \"docs: typo\"",
+            "branch": "main"
+          },
+          {
+            "command": "git push",
+            "branch": "main"
+          },
+          {
+            "command": "git push origin",
+            "branch": "master"
+          }
         ],
         "quiet": [
           "git push",
-          "gh pr status"
+          "gh pr status",
+          "gh pr create --fill --base dev",
+          "git push -u origin feat/thing",
+          "git push origin main-fix",
+          "git push origin feat/main",
+          "git push origin --delete feat/thing  # interlock-ok: its one commit is on main",
+          {
+            "command": "git commit -m \"docs: typo\"",
+            "branch": "feat/thing"
+          },
+          {
+            "command": "git push",
+            "branch": "feat/thing"
+          },
+          {
+            "command": "git push -u origin feat/thing",
+            "branch": "main"
+          }
+        ],
+        "follow": [
+          "gh pr checks 214 --watch"
         ]
       }
     },
@@ -266,12 +317,24 @@
         "gh\\s+pr\\s+merge\\b"
       ],
       "say": "Merging is not shipping. Confirm the thing is actually running where users are before calling it done.\n",
+      "follow_through": [
+        "plugin\\s+(update|install)\\b",
+        "marketplace\\s+update\\b",
+        "gh\\s+run\\s+(watch|view|list)\\b",
+        "rollout\\s+status\\b",
+        "\\b(curl|wget|Invoke-WebRequest)\\b",
+        "--version\\b"
+      ],
       "fixtures": {
         "fire": [
           "gh pr merge 214 --squash"
         ],
         "quiet": [
           "gh pr view 214"
+        ],
+        "follow": [
+          "claude plugin update core@example",
+          "kubectl rollout status deploy/web"
         ]
       }
     },
@@ -402,6 +465,10 @@
         "git\\s+clone\\b",
         "\\b(mkdir|md|New-Item)\\b[^|;&]*?\\s[\"']?([A-Za-z]:[\\\\/]|/[a-z]/)[^\\\\/\\s\"']+[\\\\/]?[\"']?(\\s|$)"
       ],
+      "exclude_patterns": [
+        "\\.claude[\\\\/]worktrees[\\\\/]",
+        "\\.worktrees[\\\\/]"
+      ],
       "say": "A folder is being made outside the repo. folder-placement: worktrees go in the harness's worktree folder or <repo>.worktrees/<task>, scratch and QA data in the scratch root via make_scratch.py, never at a drive root, and every folder gets a label so cleanup can tell it from the user's own.\n",
       "fixtures": {
         "fire": [
@@ -416,7 +483,10 @@
           "mkdir C:\\Projects\\app\\build",
           "mkdir -p /c/Projects/app/out",
           "git worktree list",
-          "git status"
+          "git status",
+          "git worktree add -b feat/x ../app.worktrees/feat-x origin/main",
+          "git worktree add .claude/worktrees/feat-x -b feat/x",
+          "git clone https://example.invalid/org/repo.git ../app.worktrees/review"
         ]
       }
     },

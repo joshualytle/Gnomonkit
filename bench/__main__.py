@@ -112,6 +112,24 @@ def _report(args) -> int:
     return 0
 
 
+def _publish(args) -> int:
+    from bench import published
+    if args.check:
+        bad = published.stale(published.load())
+        for p in bad:
+            print(f"stale: {p} -- run `python -m bench publish <results.json>`")
+        return 1 if bad else 0
+    if not args.results:
+        print("publish needs a results.json, or --check")
+        return 2
+    results = load_results(Path(args.results))
+    s = published.summary(results, as_of(results, Path(args.results)), args.mode)
+    for p in published.write(s):
+        print(f"updated {p}")
+    print(f"published round {s['round']} -> {published.LATEST}")
+    return 0
+
+
 def _compare(args) -> int:
     old = load_results(Path(args.old))["records"]
     new = load_results(Path(args.new))["records"]
@@ -152,6 +170,10 @@ def parser() -> argparse.ArgumentParser:
     rep = sub.add_parser("report", help="HTML page + README block from results.json")
     rep.add_argument("results")
     rep.add_argument("--out")
+    pub = sub.add_parser("publish", help="make a round the published one: bench/latest.json and both README tables")
+    pub.add_argument("results", nargs="?", help="the round's results.json (omit with --check)")
+    pub.add_argument("--mode", default="container", help="how the round ran, for the bench README line")
+    pub.add_argument("--check", action="store_true", help="exit 1 if a README table differs from bench/latest.json")
     c = sub.add_parser("compare", help="old vs new round")
     c.add_argument("old")
     c.add_argument("new")
@@ -171,6 +193,8 @@ def main(argv=None, launcher=None) -> int:
         return _run(args, launcher)
     if args.cmd == "report":
         return _report(args)
+    if args.cmd == "publish":
+        return _publish(args)
     if args.cmd == "compare":
         return _compare(args)
     return _gate(args)

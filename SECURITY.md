@@ -15,13 +15,17 @@ promised: Gnomonkit has one maintainer. Fixes ship in a release, and the advisor
 unless you ask otherwise.
 
 The safety hooks are heuristics: they reduce some risks and miss others, and they are not a
-sandbox or a security boundary. Gnomonkit is provided as is, without warranty; see
+sandbox or a security boundary. [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) says what each blocking
+hook defends against and its known limits. Gnomonkit is provided as is, without warranty; see
 [DISCLAIMER.md](DISCLAIMER.md).
 
 ## In scope
 
-- A hook that can be made to run code, leak data, or stay silent when it should block (for example,
-  a way past the destructive-command interlock).
+- A hook that can be made to run code, leak data, or stay silent when it should block. For example,
+  an ordinary spelling of a command the interlock lists that it lets through, or a protected file a
+  guard lets an agent write. A command deliberately disguised to hide what it does (the verb in a
+  variable, an encoded command, a script written now and run later) is a known limit, listed in the
+  threat model, not a vulnerability.
 - A script that sends data off the machine when its documentation says it doesn't.
 - The leak gates (`scripts/leakcheck.py`, `scripts/provenance_check.py`) missing a class of secret or
   private text they claim to catch.

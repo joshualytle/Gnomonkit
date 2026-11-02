@@ -75,9 +75,16 @@ core plugin's context_budget option, GNOMONKIT_CONTEXT_BUDGET or
 --context-budget, default 250k), ESTIMATED.
 
 HOOKS, all MEASURED counts, read from hook additionalContext in the transcript:
-router "skill: <name>" suggestions and their uptake (a Skill call for it, or
-a Read of its SKILL.md, within UPTAKE_WINDOW tool calls; "already loaded"
-when it was invoked earlier in that transcript); interlock blocks and how each
+router "skill: <plugin>:<name>" suggestions and their uptake (a Skill call for
+it, or a Read of its SKILL.md, within UPTAKE_WINDOW tool calls; "already
+loaded" when it was invoked earlier in that transcript, and left out of the
+uptake share). Per skill: `by`, the suggestions per plugin prefix, so a core
+suggestion stays apart from an overlay's or another library's; `followed`, the
+suggestions after which a shell command in the window matched one of the
+rule's `follow_through` patterns (from core's triggers.json, the files in
+GNOMONKIT_TRIGGER_FILES, and every installed plugin's hooks/triggers.json),
+so a suggestion acted on without loading the skill still shows. skills_self:
+Skill calls no suggestion led to, by the name called; interlock blocks and how each
 resolved within INTERLOCK_WINDOW calls (re-issued with `# interlock-ok:` after
 or without a listing command, rewritten = a later unblocked command running
 the same program, or abandoned); correction-watch fires; plugin-freshness
@@ -125,9 +132,9 @@ caller.
 
 READINESS. One row per metric: value, n, a target from READINESS_TARGETS and a
 status (ok / warn / fail; no-data below the row's min_n). Skill uptake: the
-router's suggestions of a core skill, and the share taken up (a Skill call for
-that skill, or a Read of its SKILL.md, within UPTAKE_WINDOW tool calls), as the
-HOOKS router uptake counts it; session counts stay in its detail. Interlock
+router's suggestions of a core skill not already loaded, and the share taken up
+(a Skill call for that skill, or a Read of its SKILL.md, within UPTAKE_WINDOW
+tool calls), as the HOOKS router uptake counts it; session counts stay in its detail. Interlock
 false blocks (proxy): blocks
 followed within INTERLOCK_WINDOW calls by an equivalent command (same program
 and targets, every flag kept) running unblocked without the override marker,
@@ -196,11 +203,12 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-VERSION = "0.29.0"
-SCAN_VERSION = 10               # bump when scan_file's output changes; old cache entries are ignored
+VERSION = "0.30.1"
+SCAN_VERSION = 12              # bump when scan_file's output changes; old cache entries are ignored
 LINE_CAP = 2_000_000
 CHARS_PER_TOKEN = 4
 UPTAKE_WINDOW = 10               # tool calls after a router suggestion that count as uptake
+FOLLOW_KEY_MAX = 200             # chars of each shell command kept for the follow-through check
 INTERLOCK_WINDOW = 10            # tool calls after a block that decide how it resolved
 SMALL_TOOL_CALLS = 3
 SMALL_KEPT_TOKENS = 2000
@@ -248,7 +256,9 @@ NOTIF_OPEN, NOTIF_CLOSE = "<task-notification>", "</task-notification>"
 _HANDBACK = re.compile(r'<agent-message from="([A-Za-z0-9_-]+)">(.*?)(?:</agent-message>|\Z)', re.S)
 _TAGS = ("task-id", "tool-use-id", "subagent_tokens")
 _AGENT_ID = re.compile(r"agentId: ([A-Za-z0-9_-]+)")
-_SKILL_LINE = re.compile(r"(?m)^[ \t]*skill:\s*([A-Za-z0-9_.:-]+)")    # [ \t]*: \s* re-scanned blank runs
+# [ \t]*: \s* re-scanned blank runs. A router whose skills belong to other plugins prints them bare and
+# names itself after the name, "skill: <name>  (router: <plugin>)"; the mark wins over the name's prefix.
+_SKILL_LINE = re.compile(r"(?m)^[ \t]*skill:\s*([A-Za-z0-9_.:-]+)(?:[ \t]+\(router:\s*([A-Za-z0-9_-]+)\))?")
 _INJECTED = re.compile(r"\[([LE])(\d{1,7})\b")
 _CITED = re.compile(r"\b([LE])(\d{1,7})\b")
 _DIGEST_PATH = re.compile(r"Full output: (\S+)")
@@ -558,6 +568,7 @@ def scan_file(path: Path, line_cap: int = LINE_CAP, digest: str = "") -> dict:
     usage: dict = {}
     boundaries: list = []
     calls: list = []                 # [tool_use_id, name, key]
+    call_ts: list = []               # each call's timestamp, by index into calls
     agent_calls: dict = {}
     agent_results: dict = {}
     notes: dict = {}                 # hash -> note
@@ -724,6 +735,7 @@ def scan_file(path: Path, line_cap: int = LINE_CAP, digest: str = "") -> dict:
                         else:
                             key = str(inp.get("file_path") or inp.get("path") or inp.get("pattern") or "")[:300]
                         calls.append([tid, name, key])
+                        call_ts.append(ts)
                         if len(call_keys) < CALL_KEYS_MAX and key and \
                                 (name in SHELLS or name in ("Read", "Grep", "Glob")):
                             call_keys.append([name, key[:REDO_KEY_MAX] if name != "Read"
@@ -835,7 +847,7 @@ def scan_file(path: Path, line_cap: int = LINE_CAP, digest: str = "") -> dict:
     router = []
     seen_sug = set()
     for h in hook_ctx:
-        for sk in _SKILL_LINE.findall(h["text"]):
+        for sk, mark in _SKILL_LINE.findall(h["text"]):
             key = (h["tuid"], sk)
             if key in seen_sug:
                 continue
@@ -850,9 +862,25 @@ def scan_file(path: Path, line_cap: int = LINE_CAP, digest: str = "") -> dict:
                     return cl[2].replace("\\", "/").lower().endswith("/%s/skill.md" % base.lower())
                 return False
             trigger = calls[idx - 1][2] if 0 < idx <= len(calls) else ""
-            router.append({"skill": base, "ts": h["ts"], "taken": any(hit(cl) for cl in calls[idx:idx + UPTAKE_WINDOW]),
+            window = calls[idx:idx + UPTAKE_WINDOW]
+            router.append({"skill": base, "by": mark or sk.rpartition(":")[0], "ts": h["ts"],
+                           "taken": any(hit(cl) for cl in window),
                            "prior": any(hit(cl) for cl in calls[:max(0, idx - 1)]),
-                           "scratch": "scratchpad" in trigger.lower()})
+                           "scratch": "scratchpad" in trigger.lower(),
+                           "after": [cl[2][:FOLLOW_KEY_MAX] for cl in window if cl[1] in SHELLS and cl[2]]})
+
+    # skill calls no suggestion led to: the agent picked the skill from its own list
+    suggested_at = defaultdict(list)
+    for h in hook_ctx:
+        for sk, _ in _SKILL_LINE.findall(h["text"]):
+            suggested_at[sk.split(":")[-1]].append(h["idx"])
+    skill_self = []
+    for i, cl in enumerate(calls):
+        if cl[1] != "Skill" or not cl[2]:
+            continue
+        base = cl[2].split(":")[-1]
+        if not any(j <= i < j + UPTAKE_WINDOW for j in suggested_at.get(base, ())):
+            skill_self.append({"skill": cl[2], "ts": call_ts[i]})
 
     # interlock outcomes
     index = {cl[0]: i for i, cl in enumerate(calls)}
@@ -961,7 +989,7 @@ def scan_file(path: Path, line_cap: int = LINE_CAP, digest: str = "") -> dict:
                    "by_channel": {k: list(v) for k, v in by_channel.items()},
                    "ts": hooks_ts[0] if hooks_ts else first_ts},
         "digests": dg, "prompts": len(prompts), "growth": growth, "compactions": events,
-        "skill_calls": [cl[2] for cl in calls if cl[1] == "Skill" and cl[2]],
+        "skill_calls": [cl[2] for cl in calls if cl[1] == "Skill" and cl[2]], "skill_self": skill_self,
         "correction_fired": fired, "correction_checked": sum(p[1] is not None for p in prompts),
         "hook_runs": hook_runs, "gates": gates, "title": title or ai_title,
         "turn_usage": [[mid, meta[0], meta[1]] + list(usage.get(mid, [0, 0, 0, 0])) + [meta[2], meta[3]]
@@ -1604,6 +1632,45 @@ def core_hook_scripts() -> set:
         return set()
 
 
+def trigger_files(home: Path) -> list:
+    """Every router rule file to read follow_through patterns from: core's own, the paths in
+    GNOMONKIT_TRIGGER_FILES, then the newest installed copy of each other plugin that ships a router."""
+    files = [Path(__file__).resolve().parents[2] / "hooks" / "triggers.json"]
+    files += [Path(p) for p in (os.environ.get("GNOMONKIT_TRIGGER_FILES") or "").split(os.pathsep) if p]
+    try:
+        for plugin in sorted((home / "plugins" / "cache").glob("*/*")):
+            found = [f for f in plugin.glob("*/hooks/triggers.json") if f.is_file()]
+            if found:
+                files.append(max(found, key=lambda f: f.stat().st_mtime))
+    except OSError:
+        pass
+    return files
+
+
+def follow_patterns(files: list) -> dict:
+    """{skill: [compiled follow_through regexes]}. The first file to name a skill wins; a bad file
+    or pattern is skipped, so a broken overlay never breaks the report."""
+    out: dict = {}
+    for f in files:
+        try:
+            rules = (json.loads(Path(f).read_text(encoding="utf-8")) or {}).get("triggers") or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        for r in rules:
+            if not isinstance(r, dict) or not r.get("follow_through"):
+                continue
+            base = str(r.get("skill") or "").split(":")[-1]
+            pats = []
+            for p in r["follow_through"]:
+                try:
+                    pats.append(re.compile(str(p), re.I))
+                except re.error:
+                    pass
+            if base and pats and base not in out:
+                out[base] = pats
+    return out
+
+
 def _core_skill(key: str, skills: set) -> bool:
     plug, _, base = key.rpartition(":")
     return base in skills and plug in ("", "core")
@@ -1719,12 +1786,15 @@ def readiness(sessions: dict, summaries: dict, cutoff_iso: str, sample_path: Pat
         if sug:
             suggested += 1
             invoked += int(used)
+    sug_open = sug_n - sug_prior
     rows.append(_row(
-        "skill_uptake", "Skill uptake", sug_taken / sug_n if sug_n else None, sug_n, "MEASURED",
+        "skill_uptake", "Skill uptake", sug_taken / sug_open if sug_open else None, sug_open, "MEASURED",
         "Of the skill router's suggestions of a core skill, the share taken up: a Skill call for that skill, "
         "or a Read of its SKILL.md, within %d tool calls of the suggestion. A suggestion of a skill already "
-        "loaded earlier counts as not taken (suggestions_already_loaded)." % UPTAKE_WINDOW,
-        {"suggestions": sug_n, "suggestions_taken": sug_taken, "suggestions_already_loaded": sug_prior,
+        "loaded earlier is left out (suggestions_already_loaded): loading it again changes nothing."
+        % UPTAKE_WINDOW,
+        {"suggestions": sug_n, "suggestions_open": sug_open, "suggestions_taken": sug_taken,
+         "suggestions_already_loaded": sug_prior,
          "sessions": total, "sessions_suggested": suggested, "sessions_invoked_after_suggestion": invoked,
          "sessions_with_core_skill": any_core}))
 
@@ -2526,9 +2596,10 @@ def collect(since_days: float = 30, home: Path | None = None, gk: Path | None = 
             line_cap: int = LINE_CAP, verdicts: Path | None = None, now: float | None = None,
             projects: Path | None = None, digest: str | None = None, budget: int | None = None,
             sample_path: Path | None = None, bench_dir: Path | None = None,
-            subscription_path: Path | None = None) -> dict:
+            subscription_path: Path | None = None, triggers: list | None = None) -> dict:
     digest = digest_command() if digest is None else digest
     home = home or claude_home()
+    follow = follow_patterns(trigger_files(home) if triggers is None else triggers)
     gk = gk or gnomonkit_home()
     now = now or time.time()
     cutoff = now - since_days * 86400
@@ -2593,13 +2664,26 @@ def collect(since_days: float = 30, home: Path | None = None, gk: Path | None = 
         for r in v["router"]:
             if not _in_window(r["ts"], cutoff_iso):
                 continue
-            a = router.setdefault(r["skill"], {"suggested": 0, "taken": 0, "already_loaded": 0, "scratch_paths": 0})
+            a = router.setdefault(r["skill"], {"suggested": 0, "taken": 0, "already_loaded": 0, "scratch_paths": 0,
+                                               "followed": 0, "by": {}})
             a["suggested"] += 1
             a["taken"] += int(r["taken"])
             a["already_loaded"] += int(r["prior"] and not r["taken"])
             a["scratch_paths"] += int(r["scratch"])
-    for a in router.values():
-        a["uptake"] = round(a["taken"] / a["suggested"], 3) if a["suggested"] else None
+            pats = follow.get(r["skill"])
+            a["followed"] += int(bool(pats) and any(p.search(c) for p in pats for c in r.get("after") or []))
+            by = r.get("by") or "unknown"
+            a["by"][by] = a["by"].get(by, 0) + 1
+    for name, a in router.items():
+        a["open"] = a["suggested"] - a["already_loaded"]
+        a["uptake"] = round(a["taken"] / a["open"], 3) if a["open"] else None
+        a["follow_through"] = round(a["followed"] / a["suggested"], 3) if follow.get(name) and a["suggested"] \
+            else None
+    skills_self: dict = {}
+    for v in summaries.values():
+        for c in v.get("skill_self") or []:
+            if _in_window(c["ts"], cutoff_iso):
+                skills_self[c["skill"]] = skills_self.get(c["skill"], 0) + 1
     lock = _count(i["outcome"] for v in summaries.values() for i in v["interlock"] if _in_window(i["ts"], cutoff_iso))
     pal = {"sessions": 0, "injected": 0, "cited": 0, "by_channel": {}}
     for v in summaries.values():
@@ -2617,6 +2701,7 @@ def collect(since_days: float = 30, home: Path | None = None, gk: Path | None = 
     hooks = {
         "label": "MEASURED",
         "router": dict(sorted(router.items(), key=lambda kv: -kv[1]["suggested"])),
+        "skills_self": dict(sorted(skills_self.items(), key=lambda kv: -kv[1])),
         "interlock": {"blocks": sum(lock.values()), "outcomes": dict(lock)},
         "correction_watch": {"fires": sum(1 for v in summaries.values() for t in v["correction"]
                                           if _in_window(t, cutoff_iso))},
@@ -2751,8 +2836,11 @@ def table(m: dict) -> str:
     hk = m["hooks"]
     sug = sum(a["suggested"] for a in hk["router"].values())
     took = sum(a["taken"] for a in hk["router"].values())
-    lines.append("  router suggestions %d, taken up %d; interlock blocks %d; correction fires %d" % (
-        sug, took, hk["interlock"]["blocks"], hk["correction_watch"]["fires"]))
+    opn = sum(a["open"] for a in hk["router"].values())
+    lines.append("  router suggestions %d (%d not already loaded), taken up %d; skill calls with no suggestion %d"
+                 % (sug, opn, took, sum(hk.get("skills_self", {}).values())))
+    lines.append("  interlock blocks %d; correction fires %d" % (
+        hk["interlock"]["blocks"], hk["correction_watch"]["fires"]))
     rd = m.get("readiness") or {}
     if rd.get("rows"):
         lines += ["", "  READINESS  %-8s %-30s %8s %8s %6s" % ("status", "metric", "value", "target", "n")]

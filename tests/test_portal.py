@@ -160,6 +160,18 @@ def test_missing_subscription_never_leaks_the_schedule_path():
     assert view.public_view(metrics(usage=usage_section("weird")))["sections"]["usage"]["subscription"]["status"] == "missing"
 
 
+def test_router_rows_name_the_suggesting_plugin():
+    m = metrics()
+    m["hooks"]["router"] = {"diff-review": {"suggested": 4, "taken": 2, "uptake": 0.5, "by": {"core": 3, "overlay": 1},
+                                            "follow_through": 0.25},
+                            "local-only": {"suggested": 1, "taken": 0, "by": {"unknown": 1}},
+                            "odd": {"suggested": 1, "by": {"x": "not a number", "y": 1}}}
+    rows = {r["name"]: r for r in view.public_view(m)["sections"]["effectiveness"]["hooks"]["router"]}
+    assert set(rows) == {"core:diff-review", "local-only", "y:odd"}
+    assert rows["core:diff-review"]["follow_through"] == 0.25 and "by" not in rows["core:diff-review"]
+    assert "r.follow_through" in (PLUGIN / "gnomonkit_portal" / "page.html").read_text(encoding="utf-8")
+
+
 def test_part_weeks_and_the_daily_timezone_reach_the_page():
     v = view.public_view(metrics())["sections"]
     w1, w2 = v["effectiveness"]["subagents"]["by_week"]
